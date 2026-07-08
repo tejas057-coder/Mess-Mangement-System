@@ -5,33 +5,41 @@ import {
   FaUtensils,
 } from "react-icons/fa";
 
-function Card() {
+function Card({
+  totalMembers,
+  availableRooms,
+  monthlyRevenue,
+  mealsToday,
+}) {
+  
+  
+
   const cards = [
-    {
-      title: "Total Members",
-      value: "120",
-      icon: <FaUsers />,
-      color: "#2563eb",
-    },
-    {
-      title: "Available Rooms",
-      value: "45",
-      icon: <FaBed />,
-      color: "#16a34a",
-    },
-    {
-      title: "Monthly Revenue",
-      value: "₹52,300",
-      icon: <FaRupeeSign />,
-      color: "#f59e0b",
-    },
-    {
-      title: "Meals Today",
-      value: "108",
-      icon: <FaUtensils />,
-      color: "#ef4444",
-    },
-  ];
+  {
+    title: "Total Members",
+    value: totalMembers,
+    icon: <FaUsers />,
+    color: "#2563eb",
+  },
+  {
+    title: "Available Rooms",
+    value: availableRooms,
+    icon: <FaBed />,
+    color: "#16a34a",
+  },
+  {
+    title: "Monthly Revenue",
+    value: `₹${monthlyRevenue}`,
+    icon: <FaRupeeSign />,
+    color: "#f59e0b",
+  },
+  {
+    title: "Meals Today",
+    value: mealsToday,
+    icon: <FaUtensils />,
+    color: "#ef4444",
+  },
+];
 
   
 

@@ -76,8 +76,7 @@ function Members() {
         </tbody>
       </table>
 
-            <h1>{members.length}</h1>
-
+      
       
     </div >
   );
