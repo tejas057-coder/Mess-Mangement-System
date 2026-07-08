@@ -4,7 +4,9 @@ import Navbar from "./components/Navbar.jsx";
 import Sidebar from "./components/Sidebar.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Members from "./pages/Members.jsx";
-
+import Billing from './pages/Billing.jsx'
+import Attendance from "./pages/Attendence.jsx"
+import Settings from "./pages/Settings.jsx"
 
 function App() {
   return (
@@ -20,9 +22,9 @@ function App() {
             <Routes >
             <Route path="/" element={<Dashboard />} />
             <Route path="/members" element={<Members />} />
-            {/* <Route path="/billing" element={<Billing />} />
+            <Route path="/billing" element={<Billing />} />
             <Route path="/attendance" element={<Attendance />} />
-            <Route path="/settings" element={<Settings />} /> */}
+            <Route path="/settings" element={<Settings />} />
           </Routes>
         </div>
 
