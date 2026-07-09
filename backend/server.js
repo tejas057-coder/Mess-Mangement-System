@@ -32,8 +32,6 @@ app.post("/members", (req, res) => {
             message: "Members added successfully"
         });
     })
-
-    
 });
 
 
@@ -45,11 +43,30 @@ app.get("/members/count", (req, res) => {
         if (err) {
             return res.status(500).json(err);
         }
-
         res.json(result[0]);
     });
 });
 
+app.delete("/members/:id", (req, res) => {
+    const { id } = req.params;
+    const sql = "DELETE FROM members WHERE id = ?";
+    db.query(sql, [id], (err, result) => {
+        if (err) {
+            console.log(err);
+            return res.status(500).json({
+                message: "Failed to delete member",
+            });
+        }
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                message: "Member not found",
+            });
+        }
+        res.json({
+            message: "Member deleted successfully",
+        });
+    });
+});
 
 
 app.listen(5000, () => {

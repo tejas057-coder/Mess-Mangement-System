@@ -52,9 +52,45 @@ function Members() {
     console.log("Edit member:", member);
   };
 
+  const [deleteMember, setDeleteMember] = useState(null);
   const handleDelete = (member) => {
-    console.log("Delete member:", member);
+    setDeleteMember(member);
+    console.log("Meber deleted");
   };
+  const cancelDelete = () => {
+    setDeleteMember(null);
+  };
+  const confirmDelete = async () => {
+    try {
+      const res = await fetch(
+        `http://localhost:5000/members/${deleteMember.id}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!res.ok) {
+        throw new Error("Failed to delete member");
+      }
+
+      // UI se bhi remove karo
+      setMembers((prev) =>
+        prev.filter((member) => member.id !== deleteMember.id)
+      );
+
+      // Popup close
+      setDeleteMember(null);
+
+      alert("Member deleted successfully!");
+    } catch (error) {
+      console.error(error);
+      alert("Unable to delete member.");
+    }
+  };
+
+
+
+  
 
   return (
     <div style={styles.page}>
@@ -273,6 +309,37 @@ function Members() {
           </div>
         </div>
       )}
+
+      {deleteMember && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
+            <h3>Remove Member</h3>
+
+            <p>
+              Are you sure you want to remove{" "}
+              <strong>{deleteMember.name}</strong> from the Mess?
+            </p>
+
+            <div style={styles.modalButtons}>
+              <button
+                style={styles.cancelButton}
+                onClick={cancelDelete}
+              >
+                Cancel
+              </button>
+
+              <button
+                style={styles.deleteButton}
+                onClick={confirmDelete}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
     </div>
   );
 }
@@ -609,6 +676,52 @@ const styles = {
     fontWeight: 700,
     fontSize: "14px",
     boxShadow: "0 10px 20px rgba(37, 99, 235, 0.18)",
+  },
+  modalOverlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+    backgroundColor: "rgba(0,0,0,0.5)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+  },
+
+  modal: {
+    background: "#fff",
+    padding: "24px",
+    borderRadius: "10px",
+    width: "380px",
+    textAlign: "center",
+    boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+  },
+
+  modalButtons: {
+    display: "flex",
+    justifyContent: "center",
+    gap: "12px",
+    marginTop: "20px",
+  },
+
+  cancelButton: {
+    padding: "10px 18px",
+    border: "none",
+    borderRadius: "6px",
+    background: "#6c757d",
+    color: "#fff",
+    cursor: "pointer",
+  },
+
+  deleteButton: {
+    padding: "10px 18px",
+    border: "none",
+    borderRadius: "6px",
+    background: "#dc3545",
+    color: "#fff",
+    cursor: "pointer",
   },
 };
 
