@@ -1,5 +1,7 @@
 import "./App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import Navbar from "./components/Navbar.jsx";
 import Sidebar from "./components/Sidebar.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
@@ -7,6 +9,7 @@ import Members from "./pages/Members.jsx";
 import Billing from './pages/Billing.jsx'
 import Attendance from "./pages/Attendence.jsx"
 import Settings from "./pages/Settings.jsx"
+
 
 function App() {
   return (
@@ -28,7 +31,17 @@ function App() {
           </Routes>
         </div>
 
-        </div>
+      </div>
+      
+      <ToastContainer
+        position="bottom-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        pauseOnHover
+        theme="colored"
+      />
         
          </BrowserRouter>
   );

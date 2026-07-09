@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { toast } from "react-toastify";
 
 function Members() {
   const [members, setMembers] = useState([]);
@@ -86,7 +87,8 @@ function Members() {
           )
         );
 
-        alert("Member updated successfully!");
+        // alert("Member updated successfully!");
+        toast.success("Member added successfully!");
       } else {
         // ADD MEMBER
         res = await fetch("http://localhost:5000/members", {
@@ -105,7 +107,8 @@ function Members() {
 
         setMembers((prev) => [...prev, newMember]);
 
-        alert("Member added successfully!");
+        // alert("Member added successfully!");
+        toast.success("Member added successfully!");
       }
 
       // Reset Form
@@ -156,7 +159,8 @@ function Members() {
       // Popup close
       setDeleteMember(null);
 
-      alert("Member deleted successfully!");
+      // alert("Member deleted successfully!");
+      toast.success("Member deleted successfully!");
     } catch (error) {
       console.error(error);
       alert("Unable to delete member.");
