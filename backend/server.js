@@ -17,23 +17,59 @@ app.get("/members", (req, res) => {
     });
 });
 app.post("/members", (req, res) => {
-    console.log(req.body);
-    const { name, phone, fee , startingDate} = req.body;
+    const { name, phone, fee, startingDate } = req.body;
 
     const sql = `
-    INSERT INTO members(name, phone, fee , starting_date)
-    VALUES (?,?,?,?)`;
+        INSERT INTO members(name, phone, fee, starting_date)
+        VALUES (?, ?, ?, ?)
+    `;
 
     db.query(sql, [name, phone, fee, startingDate], (err, result) => {
         if (err) {
             return res.status(500).json(err);
         }
+
         res.json({
-            message: "Members added successfully"
+            id: result.insertId,
+            name,
+            phone,
+            fee,
+            starting_date: startingDate,
         });
-    })
+    });
 });
 
+
+app.put("/members/:id", (req, res) => {
+    const { id } = req.params;
+    const { name, phone, fee, startingDate } = req.body;
+
+    const sql = `
+        UPDATE members
+        SET name = ?, phone = ?, fee = ?, starting_date = ?
+        WHERE id = ?
+    `;
+
+    db.query(sql, [name, phone, fee, startingDate, id], (err, result) => {
+        if (err) {
+            return res.status(500).json(err);
+        }
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                message: "Member not found",
+            });
+        }
+
+        res.json({
+            id: Number(id),
+            name,
+            phone,
+            fee,
+            starting_date: startingDate,
+        });
+    });
+});
 
 
 app.get("/members/count", (req, res) => {

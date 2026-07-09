@@ -13,34 +13,112 @@ function Members() {
   useEffect(() => {
     fetch("http://localhost:5000/members")
       .then((res) => res.json())
-      .then((data) => setMembers(data))
+      .then((data) => {
+        // console.log(data);
+        setMembers(data)
+      })
       .catch((err) => console.log(err));
   }, []);
 
+
+  const [editingMember, setEditingMember] = useState(null);
+
+
+  const handleEdit = (member) => {
+    setEditingMember(member);
+
+    setName(member.name);
+    setPhone(member.phone);
+    setFee(member.fee);
+    setStartingDate(
+      (member.starting_date || member.startingDate).split("T")[0]
+    );
+
+    setShowForm(true);
+  };
+  
+  const handleAddMember = () => {
+    setEditingMember(null);
+
+    setName("");
+    setPhone("");
+    setFee("");
+    setStartingDate(new Date().toISOString().split("T")[0]);
+
+    setShowForm(true);
+  };
+
   const handlesubmit = async (e) => {
     e.preventDefault();
-    const member = { name, phone, fee, startingDate };
+
+    const member = {
+      name,
+      phone,
+      fee,
+      startingDate,
+    };
 
     try {
-      const res = await fetch("http://localhost:5000/members", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(member),
-      });
+      let res;
 
-      const data = await res.json();
+      if (editingMember) {
+        // UPDATE MEMBER
+        res = await fetch(
+          `http://localhost:5000/members/${editingMember.id}`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(member),
+          }
+        );
 
-      setMembers((prev) => [...prev, data]);
+        if (!res.ok) {
+          throw new Error("Failed to update member");
+        }
 
+        const updatedMember = await res.json();
+
+        setMembers((prev) =>
+          prev.map((m) =>
+            m.id === editingMember.id ? updatedMember : m
+          )
+        );
+
+        alert("Member updated successfully!");
+      } else {
+        // ADD MEMBER
+        res = await fetch("http://localhost:5000/members", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(member),
+        });
+
+        if (!res.ok) {
+          throw new Error("Failed to add member");
+        }
+
+        const newMember = await res.json();
+
+        setMembers((prev) => [...prev, newMember]);
+
+        alert("Member added successfully!");
+      }
+
+      // Reset Form
       setName("");
       setPhone("");
       setFee("");
       setStartingDate(new Date().toISOString().split("T")[0]);
+      setEditingMember(null);
       setShowForm(false);
+
     } catch (err) {
-      console.log(err);
+      console.error(err);
+      alert("Something went wrong!");
     }
   };
 
@@ -48,14 +126,11 @@ function Members() {
     console.log("View member:", member);
   };
 
-  const handleEdit = (member) => {
-    console.log("Edit member:", member);
-  };
 
   const [deleteMember, setDeleteMember] = useState(null);
   const handleDelete = (member) => {
     setDeleteMember(member);
-    console.log("Meber deleted");
+    // console.log("Meber deleted");
   };
   const cancelDelete = () => {
     setDeleteMember(null);
@@ -102,7 +177,10 @@ function Members() {
           </p>
         </div>
 
-        <button style={styles.primaryButton} onClick={() => setShowForm(true)}>
+        <button
+          style={styles.primaryButton}
+          onClick={handleAddMember}
+        >
           + Add Member
         </button>
       </div>
@@ -232,7 +310,9 @@ function Members() {
           <div style={styles.modal}>
             <div style={styles.modalTop}>
               <div>
-                <h2 style={styles.modalTitle}>Add New Member</h2>
+                <h2 style={styles.modalTitle}>
+                  {editingMember ? "Update Member" : "Add New Member"}
+                </h2>
                 <p style={styles.modalSubtitle}>
                   Fill in member details below
                 </p>
@@ -302,7 +382,7 @@ function Members() {
                 </button>
 
                 <button type="submit" style={styles.saveBtn}>
-                  Add Member
+                  {editingMember ? "Update Member" : "Add Member"}
                 </button>
               </div>
             </form>
