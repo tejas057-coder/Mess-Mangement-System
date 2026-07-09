@@ -16,6 +16,25 @@ app.get("/members", (req, res) => {
         res.json(result);
     });
 });
+app.post("/members", (req, res) => {
+    console.log(req.body);
+    const { name, phone, fee , startingDate} = req.body;
+
+    const sql = `
+    INSERT INTO members(name, phone, fee , starting_date)
+    VALUES (?,?,?,?)`;
+
+    db.query(sql, [name, phone, fee, startingDate], (err, result) => {
+        if (err) {
+            return res.status(500).json(err);
+        }
+        res.json({
+            message: "Members added successfully"
+        });
+    })
+
+    
+});
 
 
 

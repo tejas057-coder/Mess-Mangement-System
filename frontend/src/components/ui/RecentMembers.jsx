@@ -1,153 +1,199 @@
 import { useEffect, useState } from "react";
 
 const RecentMembers = () => {
+  const [members, setMembers] = useState([]);
+  const [showAll, setShowAll] = useState(false);
 
-       const [members, setMembers] = useState([]);
-    
-      useEffect(() => {
-        fetch("http://localhost:5000/members")
-          .then((res) => res.json())
-          .then((data) => setMembers(data))
-          .catch((err) => console.log(err));
-      }, []);
-    
-    
-    
- return (
-    <div style={styles.recentMembers}>
-      <div style={styles.cardHeader}>
+  useEffect(() => {
+    fetch("http://localhost:5000/members")
+      .then((res) => res.json())
+      .then((data) => setMembers(data))
+      .catch((err) => console.log(err));
+  }, []);
+
+  const sortedMembers = [...members].sort(
+    (a, b) =>
+      new Date(b.starting_date || b.startingDate).getTime() -
+      new Date(a.starting_date || a.startingDate).getTime()
+  );
+
+  const visibleMembers = showAll ? sortedMembers : sortedMembers.slice(0, 4);
+
+  const getInitials = (name = "") =>
+    name
+      .split(" ")
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+
+  return (
+    <div style={styles.card}>
+      <div style={styles.header}>
         <div>
-          <h2 style={styles.cardHeaderTitle}>Recent Members</h2>
-          <p style={styles.cardHeaderText}>Latest member registrations</p>
+          <h2 style={styles.title}>Recent Members</h2>
+          <p style={styles.subtitle}>
+            {showAll
+              ? `Showing all ${members.length} members`
+              : `Showing top ${visibleMembers.length} recent members`}
+          </p>
         </div>
 
-        <button style={styles.viewBtn}>View All</button>
+        <button style={styles.viewBtn} onClick={() => setShowAll(!showAll)}>
+          {showAll ? "Show Recent" : "View All"}
+        </button>
       </div>
 
-      <table style={styles.table}>
-        <thead style={styles.tableHead}>
-          <tr>
-            <th style={styles.th}>Serial No</th>
-            <th style={styles.th}>Member</th>
-            <th style={styles.th}>Phone</th>
-            <th style={styles.th}>Fee</th>
-            <th style={styles.th}>Date</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {members.map((member) => (
-              <tr key={member.id} style={styles.tableRow}>
-                  
-              <td style={styles.td}>{member.id}</td>
-              
-              <td style={styles.td}>{member.name}</td>
-             <td style={styles.td}>{member.phone}</td>
-                  <td style={styles.td}>₹{member.fee}</td>
-              <td style={styles.td}>{member.starting_date}</td>
-                  
-              <td style={styles.td}>
-              </td>
+      <div style={styles.tableWrap}>
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <th style={styles.th}>S.No</th>
+              <th style={styles.th}>Member Name</th>
+              <th style={styles.th}>Phone Number</th>
+              <th style={styles.th}>Starting Date</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+
+          <tbody>
+            {visibleMembers.map((member, index) => (
+              <tr key={member.id || index} style={styles.row}>
+                <td style={styles.td}>
+                  <span style={styles.serialBadge}>{index + 1}</span>
+                </td>
+
+                <td style={styles.td}>
+                  <div style={styles.memberInfo}>
+                    <div style={styles.avatar}>{getInitials(member.name)}</div>
+                    <div style={styles.memberName}>{member.name}</div>
+                  </div>
+                </td>
+
+                <td style={styles.td}>{member.phone}</td>
+
+                <td style={styles.td}>
+                  {member.starting_date || member.startingDate
+                    ? new Date(
+                      member.starting_date || member.startingDate
+                    ).toLocaleDateString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })
+                    : "-"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
 
-
 const styles = {
-  recentMembers: {
+  card: {
     background: "#fff",
-    borderRadius: "18px",
-    padding: "22px",
-    boxShadow: "0 8px 20px rgba(0,0,0,.08)",
+    borderRadius: "20px",
+    padding: "24px",
+    boxShadow: "0 10px 30px rgba(15, 23, 42, 0.08)",
+    border: "1px solid rgba(148, 163, 184, 0.15)",
+    fontFamily: "'Inter', sans-serif",
+    overflow: "hidden",
   },
-
-  cardHeader: {
+  header: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: "20px",
+    marginBottom: "18px",
+    gap: "16px",
   },
-
-  cardHeaderTitle: {
+  title: {
     margin: 0,
+    fontSize: "22px",
+    fontWeight: 700,
+    color: "#0f172a",
   },
-
-  cardHeaderText: {
-    color: "gray",
-    marginTop: "4px",
+  subtitle: {
+    margin: "6px 0 0",
+    fontSize: "13px",
+    color: "#64748b",
   },
-
   viewBtn: {
-    background: "#2563eb",
+    background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
     color: "#fff",
     border: "none",
-    padding: "10px 18px",
-    borderRadius: "8px",
+    padding: "10px 16px",
+    borderRadius: "10px",
     cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: 600,
   },
-
+  tableWrap: {
+    width: "100%",
+    overflowX: "auto",
+  },
   table: {
     width: "100%",
-    borderCollapse: "collapse",
+    borderCollapse: "separate",
+    borderSpacing: "0 10px",
   },
-
-  tableHead: {
-    background: "#f8fafc",
-  },
-
   th: {
-    padding: "15px",
     textAlign: "left",
+    padding: "14px 16px",
+    fontSize: "12px",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    color: "#94a3b8",
+    fontWeight: 700,
   },
-
+  row: {
+    background: "#fff",
+    boxShadow: "0 4px 14px rgba(15, 23, 42, 0.05)",
+    borderRadius: "14px",
+  },
   td: {
-    padding: "15px",
-    textAlign: "left",
+    padding: "16px",
+    fontSize: "14px",
+    color: "#1e293b",
+    borderTop: "1px solid rgba(226, 232, 240, 0.7)",
+    borderBottom: "1px solid rgba(226, 232, 240, 0.7)",
   },
-
-  tableRow: {
-    borderTop: "1px solid #eee",
-  },
-
   memberInfo: {
     display: "flex",
     alignItems: "center",
     gap: "12px",
   },
-
   avatar: {
     width: "42px",
     height: "42px",
     borderRadius: "50%",
+    background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
     color: "#fff",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    fontWeight: "bold",
+    fontWeight: 700,
+    fontSize: "14px",
+    flexShrink: 0,
+    border: "3px solid rgba(59, 130, 246, 0.18)",
   },
-
-  status: {
-    padding: "6px 14px",
-    borderRadius: "20px",
-    fontSize: "13px",
+  memberName: {
     fontWeight: 600,
+    color: "#0f172a",
   },
-
-  active: {
-    background: "#dcfce7",
-    color: "#15803d",
-  },
-
-  pending: {
-    background: "#fef3c7",
-    color: "#b45309",
+  serialBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: "34px",
+    height: "34px",
+    borderRadius: "10px",
+    background: "#eff6ff",
+    color: "#2563eb",
+    fontWeight: 700,
+    fontSize: "14px",
   },
 };
-
-
 
 export default RecentMembers;
