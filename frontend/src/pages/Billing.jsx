@@ -354,7 +354,7 @@ export default function Billing() {
     rzp.open();
   }, [selectedMember, payAmount, accent.hex, fetchMembers]);
 
-  const fetchMembers = () => {
+  function fetchMembers() {
     setLoading(true);
     fetch("http://localhost:5000/members")
       .then(res => { if (!res.ok) throw new Error("Server returned an error"); return res.json(); })
@@ -363,7 +363,7 @@ export default function Billing() {
         setError("⚠️ Cannot connect to server (localhost:5000). Please ensure the backend is running.");
         setLoading(false);
       });
-  };
+  }
 
   useEffect(() => {
     fetchMembers();
