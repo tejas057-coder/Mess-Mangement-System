@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useTheme, ACCENTS } from "../context/ThemeContext";
+import { toast } from "react-toastify";
 
 const TABS = ["Profile", "Mess Details", "Notifications", "Security", "Appearance"];
 
@@ -78,27 +79,61 @@ function ProfileTab() {
   );
 }
 
-/* ── Mess Details tab ── */
 function MessDetailsTab() {
+  const [messName, setMessName] = useState(localStorage.getItem("messmate_name") || "MessMate Pro");
+  const [regNo, setRegNo] = useState(localStorage.getItem("messmate_reg_no") || "MH-PUNE-2024-1142");
+  const [capacity, setCapacity] = useState(localStorage.getItem("messmate_capacity") || "120");
+  const [occupancy, setOccupancy] = useState(localStorage.getItem("messmate_occupancy") || "96");
+  const [baseFee, setBaseFee] = useState(localStorage.getItem("messmate_base_fee") || "3000");
+  const [wifiCharges, setWifiCharges] = useState(localStorage.getItem("messmate_wifi_charges") || "300");
+  const [upiId, setUpiId] = useState(localStorage.getItem("messmate_upi_id") || "8767471502@paytm");
+
+  const handleSave = () => {
+    localStorage.setItem("messmate_name", messName);
+    localStorage.setItem("messmate_reg_no", regNo);
+    localStorage.setItem("messmate_capacity", capacity);
+    localStorage.setItem("messmate_occupancy", occupancy);
+    localStorage.setItem("messmate_base_fee", baseFee);
+    localStorage.setItem("messmate_wifi_charges", wifiCharges);
+    localStorage.setItem("messmate_upi_id", upiId);
+    toast.success("Mess details and payment settings saved successfully!");
+  };
+
   return (
     <Card>
       <h2 style={{ margin: "0 0 4px", fontSize: 20, fontWeight: 800, color: "var(--text)" }}>Mess Configuration</h2>
-      <p style={{ margin: "0 0 22px", fontSize: 13, color: "var(--text-3)" }}>Configure your mess details and pricing</p>
+      <p style={{ margin: "0 0 22px", fontSize: 13, color: "var(--text-3)" }}>Configure your mess details and payment settings</p>
 
       <div className="form-grid-2" style={{ gap: 16, marginBottom: 22 }}>
-        {[
-          ["Mess Name","MessMate Pro"],
-          ["Registration No.","MH-PUNE-2024-1142"],
-          ["Total Capacity","120"],
-          ["Current Occupancy","96"],
-          ["Base Monthly Fee (₹)","3000"],
-          ["WiFi Charges (₹)","300"],
-        ].map(([l, v]) => (
-          <div key={l} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <Label>{l}</Label>
-            <Input defaultValue={v} />
-          </div>
-        ))}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <Label>Mess Name</Label>
+          <Input value={messName} onChange={e => setMessName(e.target.value)} />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <Label>Registration No.</Label>
+          <Input value={regNo} onChange={e => setRegNo(e.target.value)} />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <Label>Total Capacity</Label>
+          <Input value={capacity} onChange={e => setCapacity(e.target.value)} />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <Label>Current Occupancy</Label>
+          <Input value={occupancy} onChange={e => setOccupancy(e.target.value)} />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <Label>Base Monthly Fee (₹)</Label>
+          <Input value={baseFee} onChange={e => setBaseFee(e.target.value)} />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <Label>WiFi Charges (₹)</Label>
+          <Input value={wifiCharges} onChange={e => setWifiCharges(e.target.value)} />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <Label>Merchant UPI ID for Payments</Label>
+          <Input value={upiId} placeholder="e.g. 8767471502@paytm" onChange={e => setUpiId(e.target.value)} />
+          <span style={{ fontSize: 11, color: "var(--text-4)", marginTop: 2 }}>*Scanned QR Codes will credit this account directly.</span>
+        </div>
       </div>
 
       <div style={{ background: "var(--bg-hover)", borderRadius: 16, padding: 18, border: "1px solid var(--border-2)" }}>
@@ -111,7 +146,7 @@ function MessDetailsTab() {
         ))}
       </div>
 
-      <div style={{ marginTop: 22 }}><PrimaryBtn>Save Configuration</PrimaryBtn></div>
+      <div style={{ marginTop: 22 }}><PrimaryBtn onClick={handleSave}>Save Configuration</PrimaryBtn></div>
     </Card>
   );
 }

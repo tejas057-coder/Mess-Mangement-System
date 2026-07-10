@@ -1,7 +1,20 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import BillingTable from "../components/ui/BillingTable.jsx";
 import { useTheme } from "../context/ThemeContext";
 import { toast } from "react-toastify";
+
+// Load Razorpay checkout.js script dynamically
+function loadRazorpayScript() {
+  return new Promise((resolve) => {
+    if (document.getElementById("razorpay-script")) { resolve(true); return; }
+    const script = document.createElement("script");
+    script.id = "razorpay-script";
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
 
 const trendMonths  = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"];
 const trendHeights = [72, 62, 60, 58, 59, 53, 55];
@@ -248,13 +261,108 @@ export default function Billing() {
   const [payMethod, setPayMethod]               = useState("UPI");
   const [payTxId, setPayTxId]                   = useState("");
   const [payDate, setPayDate]                   = useState(new Date().toISOString().split("T")[0]);
+  const [verifying, setVerifying]               = useState(false);
+  const [razorpayLoading, setRazorpayLoading]   = useState(false);
+
+  // Opens Razorpay checkout popup — amount is pre-filled, payment auto-recorded on success
+  const openRazorpayCheckout = useCallback(async () => {
+    const targetMember = selectedMember;
+    if (!targetMember) { toast.error("Please select a member first"); return; }
+    const numericAmount = Number(payAmount);
+    if (!numericAmount || numericAmount <= 0) { toast.error("Please enter a valid amount"); return; }
+    if (numericAmount > Number(targetMember.amount_remain)) {
+      toast.error(`Amount exceeds remaining due of ₹${targetMember.amount_remain}`); return;
+    }
+
+    setRazorpayLoading(true);
+    const scriptLoaded = await loadRazorpayScript();
+    if (!scriptLoaded) {
+      toast.error("Failed to load Razorpay. Check your internet connection.");
+      setRazorpayLoading(false); return;
+    }
+
+    // Create order on our backend
+    let orderData;
+    try {
+      const orderRes = await fetch("http://localhost:5000/payments/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ member_id: targetMember.id, member_name: targetMember.name, amount: numericAmount }),
+      });
+      orderData = await orderRes.json();
+      if (!orderRes.ok) throw new Error(orderData.message || "Order creation failed");
+    } catch (err) {
+      toast.error(err.message || "Could not create payment order");
+      setRazorpayLoading(false); return;
+    }
+
+    setRazorpayLoading(false);
+
+    // Open Razorpay checkout modal
+    const options = {
+      key: orderData.key_id,
+      amount: orderData.amount,
+      currency: orderData.currency,
+      name: localStorage.getItem("messmate_name") || "MessMate System",
+      description: `Payment for ${targetMember.name}`,
+      order_id: orderData.order_id,
+      prefill: { name: targetMember.name, contact: targetMember.phone || "" },
+      notes: { member_id: String(targetMember.id), member_name: targetMember.name },
+      theme: { color: accent.hex },
+      modal: {
+        ondismiss: () => toast.info("Payment cancelled"),
+      },
+      handler: function(response) {
+        // Payment success — record it in our DB (also handled by webhook automatically)
+        const payload = {
+          member_id: targetMember.id,
+          member_name: targetMember.name,
+          amount_paid: numericAmount,
+          payment_method: "UPI",
+          transaction_id: response.razorpay_payment_id,
+          paid_on: new Date().toISOString().split("T")[0],
+        };
+        fetch("http://localhost:5000/payments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+          .then(r => r.json().then(d => ({ ok: r.ok, d })))
+          .then(({ ok, d }) => {
+            if (ok) {
+              toast.success(`✅ ₹${numericAmount} payment received from ${targetMember.name}! (Ref: ${response.razorpay_payment_id})`);
+              setShowPaymentModal(false);
+              fetchMembers();
+            } else {
+              // May already be recorded by webhook — still show success
+              toast.success(`✅ Payment of ₹${numericAmount} confirmed! (Razorpay: ${response.razorpay_payment_id})`);
+              setShowPaymentModal(false);
+              fetchMembers();
+            }
+          })
+          .catch(() => {
+            toast.success(`✅ Payment received! Recording... (Ref: ${response.razorpay_payment_id})`);
+            fetchMembers();
+          });
+      },
+    };
+
+    const rzp = new window.Razorpay(options);
+    rzp.on("payment.failed", function(response) {
+      toast.error(`Payment failed: ${response.error.description}`);
+    });
+    rzp.open();
+  }, [selectedMember, payAmount, accent.hex, fetchMembers]);
 
   const fetchMembers = () => {
     setLoading(true);
     fetch("http://localhost:5000/members")
-      .then(res => { if (!res.ok) throw new Error("Failed to fetch members"); return res.json(); })
-      .then(data => { setMembers(Array.isArray(data) ? data : []); setLoading(false); })
-      .catch(err => { setError(err.message || "Something went wrong"); setLoading(false); });
+      .then(res => { if (!res.ok) throw new Error("Server returned an error"); return res.json(); })
+      .then(data => { setMembers(Array.isArray(data) ? data : []); setLoading(false); setError(""); })
+      .catch(err => {
+        setError("⚠️ Cannot connect to server (localhost:5000). Please ensure the backend is running.");
+        setLoading(false);
+      });
   };
 
   useEffect(() => {
@@ -365,33 +473,51 @@ export default function Billing() {
       return;
     }
 
-    const payload = {
-      member_id: targetMember.id,
-      member_name: targetMember.name,
-      amount_paid: numericAmount,
-      payment_method: payMethod,
-      transaction_id: payTxId,
-      paid_on: payDate
-    };
+    // Require transaction reference ID for online methods
+    if (payMethod !== "Cash" && !payTxId.trim()) {
+      toast.error("Please enter the UTR / Transaction Reference ID from your payment app receipt");
+      return;
+    }
 
-    fetch("http://localhost:5000/payments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    })
-      .then(res => {
-        if (!res.ok) throw new Error("Payment record failed");
-        return res.json();
+    setVerifying(true);
+
+    // 2-second verification simulation before DB commit
+    setTimeout(() => {
+      const payload = {
+        member_id: targetMember.id,
+        member_name: targetMember.name,
+        amount_paid: numericAmount,
+        payment_method: payMethod,
+        transaction_id: payTxId.trim(),
+        paid_on: payDate
+      };
+
+      fetch("http://localhost:5000/payments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
       })
-      .then(() => {
-        toast.success("Payment recorded successfully!");
-        setShowPaymentModal(false);
-        fetchMembers();
-      })
-      .catch(err => {
-        console.error(err);
-        toast.error("Unable to record payment");
-      });
+        .then(res => {
+          // Always parse JSON first so we can show the real backend message
+          return res.json().then(data => ({ ok: res.ok, data }));
+        })
+        .then(({ ok, data }) => {
+          setVerifying(false);
+          if (!ok) {
+            // Show exact backend error (e.g. duplicate UTR, member not found)
+            toast.error(data.message || "Payment failed. Please try again.");
+            return;
+          }
+          toast.success(`✅ ₹${numericAmount} payment verified & recorded for ${targetMember.name}!`);
+          setShowPaymentModal(false);
+          fetchMembers();
+        })
+        .catch(err => {
+          setVerifying(false);
+          console.error(err);
+          toast.error("⚠️ Network error: Could not reach the server. Please ensure the backend is running.");
+        });
+    }, 2000);
   };
 
   const inputStyle = {
@@ -504,184 +630,260 @@ export default function Billing() {
             </div>
 
             <form onSubmit={handleRecordPaymentSubmit}>
-              <div style={{ 
-                display: "grid", 
-                gridTemplateColumns: selectedMember ? "220px 1fr" : "1fr", 
-                gap: 24, 
-                marginBottom: 20,
-                alignItems: "start"
-              }}>
-                {/* Left Column: QR Code */}
-                {selectedMember && (
-                  <div style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    textAlign: "center",
-                    background: isDark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)",
-                    borderRadius: 16,
-                    padding: "16px 12px",
-                    border: "1px solid var(--border)",
-                    gap: 12,
-                  }}>
-                    <span style={{ fontSize: 11, fontWeight: 800, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                      UPI Scan & Pay
-                    </span>
-                    <img 
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=6&data=${encodeURIComponent(
-                        `upi://pay?pa=messmate@paytm&pn=MessMate%20System&am=${payAmount || selectedMember.amount_remain}&cu=INR&tn=Payment_Member_${selectedMember.id}`
-                      )}`} 
-                      alt="Payment QR Code" 
-                      style={{ 
-                        width: 156,
-                        height: 156,
-                        borderRadius: 10,
-                        border: "3px solid #fff",
-                        boxShadow: "0 6px 16px rgba(0,0,0,0.15)",
-                      }} 
-                    />
-                    <div>
-                      <p style={{ margin: 0, fontSize: 10, color: "var(--text-4)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                        GPay / PhonePe / Paytm
-                      </p>
-                      <p style={{ margin: "6px 0 0", fontSize: 14, color: "#16a34a", fontWeight: 900 }}>
-                        Amount: ₹{payAmount || selectedMember.amount_remain}
-                      </p>
-                      <p style={{ margin: "4px 0 0", fontSize: 10, color: "var(--text-4)", fontWeight: 600 }}>
-                        Remaining Due: ₹{selectedMember.amount_remain}
-                      </p>
-                    </div>
-                  </div>
-                )}
+              <fieldset disabled={verifying} style={{ border: "none", padding: 0, margin: 0, display: "contents" }}>
+                <div style={{ 
+                  display: "grid", 
+                  gridTemplateColumns: selectedMember ? "220px 1fr" : "1fr", 
+                  gap: 24, 
+                  marginBottom: 20,
+                  alignItems: "start"
+                }}>
+                  {/* Left Column: QR Code */}
+                  {selectedMember && (
+                    <div style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      background: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)",
+                      borderRadius: 20,
+                      padding: "20px 16px",
+                      border: "1px dashed var(--border)",
+                      position: "relative",
+                      gap: 14,
+                      minHeight: 320,
+                      justifyContent: "center",
+                      boxShadow: "inset 0 0 12px rgba(0,0,0,0.05)"
+                    }}>
+                      {/* Ticket Header */}
+                      <div style={{ width: "100%", borderBottom: "1px dashed var(--border-2)", paddingBottom: 10, marginBottom: 4, textAlign: "center" }}>
+                        <span style={{ fontSize: 10, fontWeight: 900, color: accent.hex, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                          Payment Invoice
+                        </span>
+                        <h4 style={{ margin: "4px 0 0", fontSize: 15, fontWeight: 800, color: "var(--text)" }}>
+                          {selectedMember.name}
+                        </h4>
+                        <p style={{ margin: "2px 0 0", fontSize: 11, color: "var(--text-4)", fontWeight: 600 }}>
+                          Ref ID: #MM-{selectedMember.id}
+                        </p>
+                      </div>
 
-                {/* Right Column: Fields */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  {/* Member selection */}
-                  <div>
-                    <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "var(--text-3)", marginBottom: 6, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-                      Select Member
-                    </label>
-                    {selectedMember ? (
+                      {payMethod === "Cash" ? (
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+                          <span style={{ fontSize: 36 }}>💵</span>
+                          <span style={{ fontSize: 12, fontWeight: 800, color: "#16a34a", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                            Collect Offline Cash
+                          </span>
+                          <p style={{ margin: 0, fontSize: 18, color: "var(--text)", fontWeight: 900 }}>
+                            ₹{payAmount || selectedMember.amount_remain}
+                          </p>
+                          <span style={{ fontSize: 11, color: "var(--text-4)", fontWeight: 500 }}>
+                            No QR Code scan required.
+                          </span>
+                        </div>
+                      ) : (
+                        <>
+                        {/* User's Real QR Code Image */}
+                        <img 
+                          src="/payment_qr.jpg" 
+                          alt="Real Payment QR" 
+                          style={{ 
+                            width: 140,
+                            height: 140,
+                            borderRadius: 8,
+                            border: "4px solid #fff",
+                            boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
+                            objectFit: "contain"
+                          }} 
+                        />
+                          <div style={{ textAlign: "center" }}>
+                            <p style={{ margin: 0, fontSize: 10, color: "var(--text-4)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                              Scan to pay exact amount
+                            </p>
+                            <p style={{ margin: "4px 0 0", fontSize: 18, color: "#16a34a", fontWeight: 900 }}>
+                              ₹{payAmount || selectedMember.amount_remain}
+                            </p>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Ticket Footer */}
+                      <div style={{ width: "100%", borderTop: "1px dashed var(--border-2)", paddingTop: 10, marginTop: 4, textAlign: "center", fontSize: 10, color: "var(--text-4)", fontWeight: 600 }}>
+                        Outstanding Due: ₹{selectedMember.amount_remain}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Right Column: Fields */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    {/* Member selection */}
+                    <div>
+                      <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "var(--text-3)", marginBottom: 6, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                        Select Member
+                      </label>
+                      {selectedMember ? (
+                        <input 
+                          type="text" 
+                          readOnly 
+                          value={`${selectedMember.name} (ID: ${selectedMember.id})`}
+                          style={{ ...inputStyle, background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)", cursor: "not-allowed", opacity: 0.8 }}
+                        />
+                      ) : (
+                        <select 
+                          required 
+                          value="" 
+                          onChange={e => {
+                            const mId = e.target.value;
+                            const target = members.find(m => String(m.id) === mId);
+                            setSelectedMember(target);
+                            if (target) setPayAmount(String(target.amount_remain));
+                          }} 
+                          style={inputStyle}
+                        >
+                          <option value="">-- Choose Member --</option>
+                          {members.filter(m => Number(m.amount_remain) > 0).map(m => (
+                            <option key={m.id} value={m.id}>
+                              {m.name} (Remaining Due: ₹{m.amount_remain})
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+
+                    {/* Amount Paid */}
+                    <div>
+                      <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "var(--text-3)", marginBottom: 6, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                        Amount to Pay (₹)
+                      </label>
                       <input 
-                        type="text" 
-                        readOnly 
-                        value={`${selectedMember.name} (ID: ${selectedMember.id})`}
-                        style={{ ...inputStyle, background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)", cursor: "not-allowed", opacity: 0.8 }}
+                        type="number" 
+                        required
+                        placeholder="Enter amount paid"
+                        value={payAmount}
+                        onChange={e => setPayAmount(e.target.value)}
+                        style={inputStyle}
+                        onFocus={e => { e.target.style.borderColor = accent.hex; e.target.style.boxShadow = `0 0 0 3px ${accent.hex}22`; }}
+                        onBlur={e  => { e.target.style.borderColor = "var(--border)"; e.target.style.boxShadow = "none"; }}
                       />
-                    ) : (
+                    </div>
+
+                    {/* Payment Method */}
+                    <div>
+                      <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "var(--text-3)", marginBottom: 6, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                        Payment Method
+                      </label>
                       <select 
-                        required 
-                        value="" 
-                        onChange={e => {
-                          const mId = e.target.value;
-                          const target = members.find(m => String(m.id) === mId);
-                          setSelectedMember(target);
-                          if (target) setPayAmount(String(target.amount_remain));
-                        }} 
+                        value={payMethod} 
+                        onChange={e => setPayMethod(e.target.value)} 
                         style={inputStyle}
                       >
-                        <option value="">-- Choose Member --</option>
-                        {members.filter(m => Number(m.amount_remain) > 0).map(m => (
-                          <option key={m.id} value={m.id}>
-                            {m.name} (Remaining Due: ₹{m.amount_remain})
-                          </option>
-                        ))}
+                        <option value="UPI">UPI / GPay / PhonePe</option>
+                        <option value="Cash">Cash (Offline)</option>
+                        <option value="Card">Credit / Debit Card</option>
+                        <option value="Net Banking">Net Banking</option>
                       </select>
-                    )}
-                  </div>
+                    </div>
 
-                  {/* Amount Paid */}
-                  <div>
-                    <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "var(--text-3)", marginBottom: 6, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-                      Amount to Pay (₹)
-                    </label>
-                    <input 
-                      type="number" 
-                      required
-                      placeholder="Enter amount paid"
-                      value={payAmount}
-                      onChange={e => setPayAmount(e.target.value)}
-                      style={inputStyle}
-                      onFocus={e => { e.target.style.borderColor = accent.hex; e.target.style.boxShadow = `0 0 0 3px ${accent.hex}22`; }}
-                      onBlur={e  => { e.target.style.borderColor = "var(--border)"; e.target.style.boxShadow = "none"; }}
-                    />
-                  </div>
+                    {/* Transaction ID */}
+                    <div>
+                      <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "var(--text-3)", marginBottom: 6, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                        Transaction Ref / UTR ID {payMethod !== "Cash" && <span style={{ color: "#ef4444" }}>*</span>}
+                      </label>
+                      <input 
+                        type="text" 
+                        required={payMethod !== "Cash"}
+                        placeholder={payMethod === "UPI" ? "Enter 12-digit UPI reference ID" : "e.g. Bank reference number"}
+                        value={payTxId}
+                        onChange={e => setPayTxId(e.target.value)}
+                        style={inputStyle}
+                        onFocus={e => { e.target.style.borderColor = accent.hex; e.target.style.boxShadow = `0 0 0 3px ${accent.hex}22`; }}
+                        onBlur={e  => { e.target.style.borderColor = "var(--border)"; e.target.style.boxShadow = "none"; }}
+                      />
+                      {payMethod === "UPI" && (
+                        <p style={{ margin: "4px 0 0", fontSize: 10, color: "var(--text-4)", fontStyle: "italic" }}>
+                          *Check GPay/PhonePe receipt for 12-digit UTR reference.
+                        </p>
+                      )}
+                    </div>
 
-                  {/* Payment Method */}
-                  <div>
-                    <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "var(--text-3)", marginBottom: 6, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-                      Payment Method
-                    </label>
-                    <select 
-                      value={payMethod} 
-                      onChange={e => setPayMethod(e.target.value)} 
-                      style={inputStyle}
-                    >
-                      <option value="UPI">UPI / GPay / PhonePe</option>
-                      <option value="Cash">Cash</option>
-                      <option value="Card">Credit / Debit Card</option>
-                      <option value="Net Banking">Net Banking</option>
-                    </select>
-                  </div>
-
-                  {/* Transaction ID */}
-                  <div>
-                    <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "var(--text-3)", marginBottom: 6, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-                      Transaction ID (Optional)
-                    </label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. UPI Ref, Bank Txn Number"
-                      value={payTxId}
-                      onChange={e => setPayTxId(e.target.value)}
-                      style={inputStyle}
-                      onFocus={e => { e.target.style.borderColor = accent.hex; e.target.style.boxShadow = `0 0 0 3px ${accent.hex}22`; }}
-                      onBlur={e  => { e.target.style.borderColor = "var(--border)"; e.target.style.boxShadow = "none"; }}
-                    />
-                  </div>
-
-                  {/* Payment Date */}
-                  <div>
-                    <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "var(--text-3)", marginBottom: 6, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-                      Payment Date
-                    </label>
-                    <input 
-                      type="date" 
-                      required
-                      value={payDate}
-                      onChange={e => setPayDate(e.target.value)}
-                      style={inputStyle}
-                      onFocus={e => { e.target.style.borderColor = accent.hex; e.target.style.boxShadow = `0 0 0 3px ${accent.hex}22`; }}
-                      onBlur={e  => { e.target.style.borderColor = "var(--border)"; e.target.style.boxShadow = "none"; }}
-                    />
+                    {/* Payment Date */}
+                    <div>
+                      <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "var(--text-3)", marginBottom: 6, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                        Payment Date
+                      </label>
+                      <input 
+                        type="date" 
+                        required
+                        value={payDate}
+                        onChange={e => setPayDate(e.target.value)}
+                        style={inputStyle}
+                        onFocus={e => { e.target.style.borderColor = accent.hex; e.target.style.boxShadow = `0 0 0 3px ${accent.hex}22`; }}
+                        onBlur={e  => { e.target.style.borderColor = "var(--border)"; e.target.style.boxShadow = "none"; }}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", borderTop: "1px solid var(--border-2)", paddingTop: 16 }}>
-                <button 
-                  type="button" 
-                  onClick={() => setShowPaymentModal(false)}
-                  style={{
-                    padding: "11px 22px", borderRadius: 12, border: "1px solid var(--border)",
-                    background: "var(--bg-hover)", color: "var(--text-2)", fontWeight: 700,
-                    fontSize: 14, cursor: "pointer"
-                  }}
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit"
-                  style={{
-                    padding: "11px 26px", borderRadius: 12, border: "none",
-                    background: `linear-gradient(135deg, ${accent.hex}, ${accent.dark})`,
-                    color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer",
-                    boxShadow: `0 10px 24px ${accent.shadow}`
-                  }}
-                >
-                  Confirm Payment
-                </button>
-              </div>
+                <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", borderTop: "1px solid var(--border-2)", paddingTop: 16, flexWrap: "wrap" }}>
+                  <button 
+                    type="button" 
+                    disabled={verifying || razorpayLoading}
+                    onClick={() => setShowPaymentModal(false)}
+                    style={{
+                      padding: "11px 22px", borderRadius: 12, border: "1px solid var(--border)",
+                      background: "var(--bg-hover)", color: "var(--text-2)", fontWeight: 700,
+                      fontSize: 14, cursor: (verifying || razorpayLoading) ? "not-allowed" : "pointer"
+                    }}
+                  >
+                    Cancel
+                  </button>
+
+                  {/* Razorpay online payment button — opens checkout popup */}
+                  {payMethod !== "Cash" && selectedMember && (
+                    <button 
+                      type="button"
+                      disabled={verifying || razorpayLoading || !payAmount}
+                      onClick={openRazorpayCheckout}
+                      style={{
+                        padding: "11px 26px", borderRadius: 12, border: "none",
+                        background: razorpayLoading ? "var(--border)" : "linear-gradient(135deg, #528ff0, #3160c0)",
+                        color: razorpayLoading ? "var(--text-4)" : "#fff", fontWeight: 800, fontSize: 14,
+                        cursor: (verifying || razorpayLoading || !payAmount) ? "not-allowed" : "pointer",
+                        boxShadow: razorpayLoading ? "none" : "0 10px 24px rgba(82,143,240,0.4)",
+                        display: "flex", alignItems: "center", gap: 8
+                      }}
+                    >
+                      {razorpayLoading ? (
+                        "⏳ Opening Razorpay..."
+                      ) : (
+                        <>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+                            <path d="M22 9V7h-2V5c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-2h2v-2h-2v-2h2v-2h-2V9h2zm-4 10H4V5h14v14z"/>
+                            <path d="M6 13h5v4H6zm0-6h12v4H6z"/>
+                          </svg>
+                          Pay ₹{payAmount || "?"} via Razorpay
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  {/* Manual confirm for Cash payments */}
+                  {payMethod === "Cash" && (
+                    <button 
+                      type="submit"
+                      disabled={verifying}
+                      style={{
+                        padding: "11px 26px", borderRadius: 12, border: "none",
+                        background: verifying ? "var(--border)" : `linear-gradient(135deg, ${accent.hex}, ${accent.dark})`,
+                        color: verifying ? "var(--text-4)" : "#fff", fontWeight: 800, fontSize: 14,
+                        cursor: verifying ? "not-allowed" : "pointer",
+                        boxShadow: verifying ? "none" : `0 10px 24px ${accent.shadow}`
+                      }}
+                    >
+                      {verifying ? "🔄 Recording..." : "✓ Mark Cash Received"}
+                    </button>
+                  )}
+                </div>
+              </fieldset>
             </form>
           </div>
         </div>

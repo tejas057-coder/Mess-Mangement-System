@@ -126,21 +126,21 @@ function Members() {
       let res;
       if (editingMember) {
         res = await fetch(`http://localhost:5000/members/${editingMember.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(member) });
-        if (!res.ok) throw new Error("Failed to update member");
-        const updated = await res.json();
-        setMembers(prev => prev.map(m => m.id === editingMember.id ? updated : m));
+        const updData = await res.json();
+        if (!res.ok) { toast.error(updData.message || "Failed to update member"); return; }
+        setMembers(prev => prev.map(m => m.id === editingMember.id ? updData : m));
         toast.success("Member updated successfully!");
       } else {
         res = await fetch("http://localhost:5000/members", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(member) });
-        if (!res.ok) throw new Error("Failed to add member");
-        const newM = await res.json();
-        setMembers(prev => [...prev, newM]);
+        const newData = await res.json();
+        if (!res.ok) { toast.error(newData.message || "Failed to add member"); return; }
+        setMembers(prev => [...prev, newData]);
         toast.success("Member added successfully!");
       }
       setName(""); setPhone(""); setAmountPaid(""); setAmountRemain(""); setDueDate(""); setPaidOn(""); setStatus("pending"); setTotalAmount("");
       setStartingDate(new Date().toISOString().split("T")[0]);
       setEditingMember(null); setShowForm(false);
-    } catch (err) { console.error(err); alert("Something went wrong!"); }
+    } catch (err) { console.error(err); toast.error("⚠️ Network error: Could not reach server. Make sure the backend is running on port 5000."); }
   };
 
   const handleDelete  = (member) => setDeleteMember(member);
@@ -148,11 +148,12 @@ function Members() {
   const confirmDelete = async () => {
     try {
       const res = await fetch(`http://localhost:5000/members/${deleteMember.id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete member");
+      const delData = await res.json();
+      if (!res.ok) { toast.error(delData.message || "Failed to delete member"); return; }
       setMembers(prev => prev.filter(m => m.id !== deleteMember.id));
       setDeleteMember(null);
       toast.success("Member deleted successfully!");
-    } catch (error) { console.error(error); alert("Unable to delete member."); }
+    } catch (error) { console.error(error); toast.error("⚠️ Network error: Could not reach server."); }
   };
 
   const filteredMembers = useMemo(() => {

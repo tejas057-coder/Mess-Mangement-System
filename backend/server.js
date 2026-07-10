@@ -1,8 +1,20 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const crypto = require("crypto");
+const Razorpay = require("razorpay");
 const db = require("./db");
 
 const app = express();
+
+// Razorpay instance — uses your keys from .env file
+const razorpay = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID || "rzp_test_REPLACE_WITH_YOUR_KEY_ID",
+    key_secret: process.env.RAZORPAY_KEY_SECRET || "REPLACE_WITH_YOUR_KEY_SECRET",
+});
+
+// Raw body parser needed ONLY for webhook signature verification
+app.use("/webhook/razorpay", express.raw({ type: "application/json" }));
 
 app.use(cors());
 app.use(express.json());
@@ -60,8 +72,32 @@ const initDB = () => {
         )
     `;
     db.query(createNotificationsTable, (err) => {
-        if (err) console.error("Error creating notifications table:", err);
-        else console.log("Notifications table verified/created");
+        if (err) {
+            console.error("Error creating notifications table:", err);
+            return;
+        }
+        console.log("Notifications table verified/created");
+
+        // Sync and correct any corrupted or inconsistent member financials on startup
+        const syncFinancialsQuery = `
+            UPDATE members m
+            LEFT JOIN (
+                SELECT member_id, SUM(amount_paid) AS total_paid
+                FROM payments
+                GROUP BY member_id
+            ) p ON m.id = p.member_id
+            SET 
+                m.amount_paid = COALESCE(p.total_paid, 0),
+                m.amount_remain = GREATEST(0, m.total_amount - COALESCE(p.total_paid, 0)),
+                m.status = CASE 
+                    WHEN GREATEST(0, m.total_amount - COALESCE(p.total_paid, 0)) <= 0 THEN 'paid'
+                    ELSE 'pending'
+                END
+        `;
+        db.query(syncFinancialsQuery, (syncErr) => {
+            if (syncErr) console.error("Error syncing members financial integrity on startup:", syncErr);
+            else console.log("Database financial consistency synced and verified successfully on startup");
+        });
     });
 };
 
@@ -112,18 +148,23 @@ app.post("/members", (req, res) => {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
+    const paid = Number(amount_paid || 0);
+    const total = Number(total_amount || 0);
+    const remain = Math.max(0, total - paid);
+    const computedStatus = remain <= 0 ? "paid" : (status || "pending");
+
     db.query(
         sql,
         [
             name,
             phone,
             starting_date,
-            amount_paid || 0,
-            amount_remain || 0,
+            paid,
+            remain,
             due_date,
             paid_on,
-            status || "pending",
-            total_amount || 0,
+            computedStatus,
+            total,
         ],
         (err, result) => {
             if (err) {
@@ -133,7 +174,7 @@ app.post("/members", (req, res) => {
 
             // Create notification automatically
             const notifTitle = "New Member Joined";
-            const notifMsg = `${name} has been registered as a new member with total amount ₹${total_amount || 0}.`;
+            const notifMsg = `${name} has been registered as a new member with total amount ₹${total}.`;
             const sqlNotif = "INSERT INTO notifications (title, message, type) VALUES (?, ?, 'member')";
             db.query(sqlNotif, [notifTitle, notifMsg], (notifErr) => {
                 if (notifErr) console.error("Error creating member notification:", notifErr);
@@ -144,12 +185,12 @@ app.post("/members", (req, res) => {
                 name,
                 phone,
                 starting_date,
-                amount_paid,
-                amount_remain,
+                amount_paid: paid,
+                amount_remain: remain,
                 due_date,
                 paid_on,
-                status: status || "pending",
-                total_amount,
+                status: computedStatus,
+                total_amount: total,
             });
         }
     );
@@ -368,74 +409,222 @@ app.get("/payments", (req, res) => {
 app.post("/payments", (req, res) => {
     const { member_id, member_name, amount_paid, payment_method, transaction_id, paid_on } = req.body;
 
-    // 1. Fetch current member details
-    const selectMemberSql = "SELECT * FROM members WHERE id = ?";
-    db.query(selectMemberSql, [member_id], (err, membersResult) => {
-        if (err) {
-            console.log(err);
-            return res.status(500).json(err);
-        }
-        if (membersResult.length === 0) {
-            return res.status(404).json({ message: "Member not found" });
-        }
+    // A. Check for duplicate Transaction ID (UPI Reference/UTR ID) if payment is online
+    if (payment_method !== "Cash" && transaction_id) {
+        const dupCheckSql = "SELECT id FROM payments WHERE transaction_id = ?";
+        db.query(dupCheckSql, [transaction_id], (dupErr, dupRes) => {
+            if (dupErr) {
+                console.log(dupErr);
+                return res.status(500).json(dupErr);
+            }
+            if (dupRes.length > 0) {
+                return res.status(400).json({ message: "Duplicate Transaction: This UPI Reference / UTR ID has already been recorded in the system." });
+            }
+            
+            // Proceed to fetch member details and update
+            processPayment();
+        });
+    } else {
+        processPayment();
+    }
 
-        const member = membersResult[0];
-        const newPaid = Number(member.amount_paid || 0) + Number(amount_paid);
-        const newRemain = Math.max(0, Number(member.total_amount || 0) - newPaid);
-        const newStatus = newRemain <= 0 ? "paid" : "pending";
-
-        // 2. Update member details
-        const updateMemberSql = `
-            UPDATE members
-            SET amount_paid = ?, amount_remain = ?, status = ?, paid_on = ?
-            WHERE id = ?
-        `;
-        db.query(updateMemberSql, [newPaid, newRemain, newStatus, paid_on, member_id], (updateErr) => {
-            if (updateErr) {
-                console.log(updateErr);
-                return res.status(500).json(updateErr);
+    function processPayment() {
+        // 1. Fetch current member details
+        const selectMemberSql = "SELECT * FROM members WHERE id = ?";
+        db.query(selectMemberSql, [member_id], (err, membersResult) => {
+            if (err) {
+                console.log(err);
+                return res.status(500).json(err);
+            }
+            if (membersResult.length === 0) {
+                return res.status(404).json({ message: "Member not found" });
             }
 
-            // 3. Insert transaction log
-            const insertPaymentSql = `
-                INSERT INTO payments (member_id, member_name, amount_paid, payment_method, transaction_id, paid_on)
-                VALUES (?, ?, ?, ?, ?, ?)
+            const member = membersResult[0];
+            const newPaid = Number(member.amount_paid || 0) + Number(amount_paid);
+            const newRemain = Math.max(0, Number(member.total_amount || 0) - newPaid);
+            const newStatus = newRemain <= 0 ? "paid" : "pending";
+
+            // 2. Update member details
+            const updateMemberSql = `
+                UPDATE members
+                SET amount_paid = ?, amount_remain = ?, status = ?, paid_on = ?
+                WHERE id = ?
             `;
-            db.query(insertPaymentSql, [member_id, member_name, amount_paid, payment_method, transaction_id, paid_on], (insertErr, paymentResult) => {
-                if (insertErr) {
-                    console.log(insertErr);
-                    return res.status(500).json(insertErr);
+            db.query(updateMemberSql, [newPaid, newRemain, newStatus, paid_on, member_id], (updateErr) => {
+                if (updateErr) {
+                    console.log(updateErr);
+                    return res.status(500).json(updateErr);
                 }
 
-                // 4. Automatically trigger a notification
-                const notificationTitle = `Payment Received`;
-                const notificationMessage = `Successfully recorded ₹${amount_paid} from ${member_name} via ${payment_method}.`;
-                const insertNotificationSql = "INSERT INTO notifications (title, message, type) VALUES (?, ?, 'payment')";
-                
-                db.query(insertNotificationSql, [notificationTitle, notificationMessage], (notifErr) => {
-                    if (notifErr) console.error("Error creating payment notification:", notifErr);
-                });
-
-                res.json({
-                    message: "Payment successfully recorded",
-                    payment: {
-                        id: paymentResult.insertId,
-                        member_id,
-                        member_name,
-                        amount_paid,
-                        payment_method,
-                        transaction_id,
-                        paid_on
-                    },
-                    member: {
-                        id: member_id,
-                        amount_paid: newPaid,
-                        amount_remain: newRemain,
-                        status: newStatus,
-                        paid_on
+                // 3. Insert transaction log
+                const insertPaymentSql = `
+                    INSERT INTO payments (member_id, member_name, amount_paid, payment_method, transaction_id, paid_on)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                `;
+                db.query(insertPaymentSql, [member_id, member_name, amount_paid, payment_method, transaction_id, paid_on], (insertErr, paymentResult) => {
+                    if (insertErr) {
+                        console.log(insertErr);
+                        return res.status(500).json(insertErr);
                     }
+
+                    // 4. Automatically trigger a notification
+                    const notificationTitle = `Payment Received`;
+                    const notificationMessage = `Successfully recorded ₹${amount_paid} from ${member_name} via ${payment_method}.`;
+                    const insertNotificationSql = "INSERT INTO notifications (title, message, type) VALUES (?, ?, 'payment')";
+                    
+                    db.query(insertNotificationSql, [notificationTitle, notificationMessage], (notifErr) => {
+                        if (notifErr) console.error("Error creating payment notification:", notifErr);
+                    });
+
+                    res.json({
+                        message: "Payment successfully recorded",
+                        payment: {
+                            id: paymentResult.insertId,
+                            member_id,
+                            member_name,
+                            amount_paid,
+                            payment_method,
+                            transaction_id,
+                            paid_on
+                        },
+                        member: {
+                            id: member_id,
+                            amount_paid: newPaid,
+                            amount_remain: newRemain,
+                            status: newStatus,
+                            paid_on
+                        }
+                    });
                 });
             });
+        });
+    }
+});
+
+// ─────────────────────────────────────────────
+// RAZORPAY ROUTES
+// ─────────────────────────────────────────────
+
+// Create a Razorpay order for a specific member payment
+app.post("/payments/create-order", async (req, res) => {
+    const { member_id, member_name, amount } = req.body;
+
+    if (!member_id || !amount || amount <= 0) {
+        return res.status(400).json({ message: "Invalid member or amount" });
+    }
+
+    try {
+        const order = await razorpay.orders.create({
+            amount: Math.round(amount * 100), // Razorpay uses paise (₹1 = 100 paise)
+            currency: "INR",
+            receipt: `mess_${member_id}_${Date.now()}`,
+            notes: {
+                member_id: String(member_id),
+                member_name: member_name,
+            },
+        });
+
+        res.json({
+            order_id: order.id,
+            amount: order.amount,
+            currency: order.currency,
+            key_id: process.env.RAZORPAY_KEY_ID || "rzp_test_REPLACE_WITH_YOUR_KEY_ID",
+        });
+    } catch (err) {
+        console.error("Razorpay order creation failed:", err);
+        res.status(500).json({ message: "Failed to create payment order. Check your Razorpay API keys in .env file." });
+    }
+});
+
+// Razorpay Webhook — auto-records payment when Razorpay confirms payment.captured
+app.post("/webhook/razorpay", (req, res) => {
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || "";
+    const signature = req.headers["x-razorpay-signature"];
+    const rawBody = req.body; // raw buffer from express.raw middleware
+
+    // Verify webhook signature to ensure it's genuinely from Razorpay
+    if (webhookSecret && signature) {
+        const expectedSignature = crypto
+            .createHmac("sha256", webhookSecret)
+            .update(rawBody)
+            .digest("hex");
+
+        if (expectedSignature !== signature) {
+            console.warn("Razorpay webhook: Invalid signature — rejected");
+            return res.status(401).json({ message: "Invalid signature" });
+        }
+    }
+
+    let event;
+    try {
+        event = JSON.parse(rawBody.toString());
+    } catch (e) {
+        return res.status(400).json({ message: "Invalid JSON body" });
+    }
+
+    // Only process payment.captured events (money actually received)
+    if (event.event !== "payment.captured") {
+        return res.json({ status: "ignored" });
+    }
+
+    const payment = event.payload.payment.entity;
+    const member_id = Number(payment.notes?.member_id);
+    const member_name = payment.notes?.member_name || "Unknown";
+    const amount_paid = payment.amount / 100; // convert paise back to ₹
+    const transaction_id = payment.id; // Razorpay payment ID (e.g. pay_xxxxxx)
+    const paid_on = new Date().toISOString().split("T")[0];
+    const payment_method = payment.method || "UPI";
+
+    if (!member_id) {
+        console.warn("Webhook received but no member_id in notes");
+        return res.json({ status: "no_member_id" });
+    }
+
+    // Check for duplicate webhook (same Razorpay payment ID)
+    db.query("SELECT id FROM payments WHERE transaction_id = ?", [transaction_id], (dupErr, dupRes) => {
+        if (dupErr) return res.status(500).json({ message: "DB error checking duplicate" });
+        if (dupRes.length > 0) {
+            console.log("Webhook duplicate payment ignored:", transaction_id);
+            return res.json({ status: "duplicate_ignored" });
+        }
+
+        // Fetch member and update
+        db.query("SELECT * FROM members WHERE id = ?", [member_id], (err, membersResult) => {
+            if (err || membersResult.length === 0) {
+                return res.status(404).json({ message: "Member not found" });
+            }
+
+            const member = membersResult[0];
+            const newPaid = Number(member.amount_paid || 0) + Number(amount_paid);
+            const newRemain = Math.max(0, Number(member.total_amount || 0) - newPaid);
+            const newStatus = newRemain <= 0 ? "paid" : "pending";
+
+            // Update member financials
+            db.query(
+                "UPDATE members SET amount_paid = ?, amount_remain = ?, status = ?, paid_on = ? WHERE id = ?",
+                [newPaid, newRemain, newStatus, paid_on, member_id],
+                (updateErr) => {
+                    if (updateErr) return res.status(500).json(updateErr);
+
+                    // Insert immutable payment log
+                    db.query(
+                        "INSERT INTO payments (member_id, member_name, amount_paid, payment_method, transaction_id, paid_on) VALUES (?, ?, ?, ?, ?, ?)",
+                        [member_id, member_name, amount_paid, payment_method, transaction_id, paid_on],
+                        (insertErr) => {
+                            if (insertErr) return res.status(500).json(insertErr);
+
+                            // Log notification
+                            const title = "💰 Payment Auto-Confirmed via Razorpay";
+                            const message = `₹${amount_paid} received from ${member_name} (Ref: ${transaction_id}). Balance updated automatically.`;
+                            db.query("INSERT INTO notifications (title, message, type) VALUES (?, ?, 'payment')", [title, message]);
+
+                            console.log(`✅ Webhook: Auto-recorded ₹${amount_paid} from ${member_name} (Razorpay: ${transaction_id})`);
+                            res.json({ status: "success", member_id, amount_paid });
+                        }
+                    );
+                }
+            );
         });
     });
 });
