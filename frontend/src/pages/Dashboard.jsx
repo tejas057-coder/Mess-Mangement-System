@@ -1,20 +1,14 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Card from "../components/ui/Card";
 import RecentMembers from "../components/ui/RecentMembers";
 import MemberGrowth from "../components/ui/MemberGrowth";
 import QuickSummary from "../components/ui/QuickSummary";
-import { useState , useEffect} from "react";
-
-
-
 
 const Dashboard = () => {
-
-const [members, setMembers] = useState([100]);
-const [rooms, setRooms] = useState([100]);
-const [revenue, setRevenue] = useState(100);
-const [mealsToday, setMealsToday] = useState(100);
-
+  const [members, setMembers] = useState([]);
+  const [rooms, setRooms] = useState([]);
+  const [revenue, setRevenue] = useState(100);
+  const [mealsToday, setMealsToday] = useState(100);
 
   useEffect(() => {
     fetch("http://localhost:5000/members")
@@ -23,16 +17,14 @@ const [mealsToday, setMealsToday] = useState(100);
       .catch((err) => console.log(err));
   }, []);
 
-
-  
   return (
     <div style={styles.page}>
       <Card
-      totalMembers={members.length}
-      availableRooms={rooms.length}
-      monthlyRevenue={revenue}
-      mealsToday={mealsToday}
-    />
+        totalMembers={members.length}
+        availableRooms={rooms.length}
+        monthlyRevenue={revenue}
+        mealsToday={mealsToday}
+      />
 
       <div style={styles.dashboard}>
         <div style={styles.dashboardLeft}>
@@ -52,10 +44,12 @@ const styles = {
   page: {
     background: "#ffffff",
     minHeight: "100vh",
-    maxHeight:"200vh",
+    maxHeight: "200vh",
     padding: "24px",
+    overflowY: "auto",
+    scrollBehavior: "smooth",
+    WebkitOverflowScrolling: "touch",
   },
-
   dashboard: {
     display: "grid",
     gridTemplateColumns: "2fr 1fr",
@@ -63,12 +57,10 @@ const styles = {
     marginTop: "24px",
     alignItems: "start",
   },
-
   dashboardLeft: {
     display: "flex",
     flexDirection: "column",
   },
-
   dashboardRight: {
     display: "flex",
     flexDirection: "column",

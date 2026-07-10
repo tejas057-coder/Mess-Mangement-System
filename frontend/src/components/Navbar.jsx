@@ -1,8 +1,17 @@
-import { useState } from "react";
-import { FaSearch, FaBell, FaTimes } from "react-icons/fa";
+import { useMemo, useState } from "react";
+import { FaSearch, FaBell, FaTimes, FaCalendarAlt } from "react-icons/fa";
 
 function Navbar({ members = [], setFilteredMembers, onSearch }) {
   const [query, setQuery] = useState("");
+
+  const today = useMemo(() => {
+    return new Date().toLocaleDateString("en-IN", {
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  }, []);
 
   const handleSearch = () => {
     const value = query.trim().toLowerCase();
@@ -54,7 +63,12 @@ function Navbar({ members = [], setFilteredMembers, onSearch }) {
       </div>
 
       <div style={styles.right}>
-        <button style={styles.bell}>
+        <div style={styles.dateBox}>
+          <FaCalendarAlt style={styles.dateIcon} />
+          <span style={styles.dateText}>{today}</span>
+        </div>
+
+        <button style={styles.bell} type="button">
           <FaBell />
           <span style={styles.dot}></span>
         </button>
@@ -74,22 +88,33 @@ function Navbar({ members = [], setFilteredMembers, onSearch }) {
 const styles = {
   navbar: {
     height: "84px",
-    background: "rgba(255,255,255,0.9)",
-    backdropFilter: "blur(12px)",
+    minHeight: "84px",
+
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
+
     padding: "0 28px",
+    gap: "16px",
+
+    background:
+      "linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,251,255,0.92))",
+    backdropFilter: "blur(14px)",
+
     borderBottom: "1px solid rgba(226,232,240,0.9)",
-    boxShadow: "0 8px 24px rgba(15, 23, 42, 0.05)",
+    boxShadow: "0 10px 28px rgba(15, 23, 42, 0.06)",
+
     position: "sticky",
     top: 0,
-    zIndex: 50,
-  },
+    left: 0,
 
+    zIndex: 1000,
+
+    flexShrink: 0,
+  },
   searchBox: {
-    width: "min(560px, 100%)",
-    height: "48px",
+    width: "min(620px, 100%)",
+    height: "50px",
     background: "#f8fbff",
     border: "1px solid #dbe3ee",
     borderRadius: "16px",
@@ -98,13 +123,13 @@ const styles = {
     padding: "0 12px 0 14px",
     gap: "10px",
     boxShadow: "inset 0 1px 0 rgba(255,255,255,0.8)",
+    flex: 1,
+    minWidth: "280px",
   },
-
   searchIcon: {
     color: "#94a3b8",
     fontSize: "14px",
   },
-
   input: {
     flex: 1,
     border: "none",
@@ -113,7 +138,6 @@ const styles = {
     fontSize: "14px",
     color: "#0f172a",
   },
-
   clearBtn: {
     width: "32px",
     height: "32px",
@@ -126,7 +150,6 @@ const styles = {
     justifyContent: "center",
     cursor: "pointer",
   },
-
   searchBtn: {
     height: "36px",
     padding: "0 16px",
@@ -139,13 +162,32 @@ const styles = {
     cursor: "pointer",
     boxShadow: "0 10px 18px rgba(37, 99, 235, 0.16)",
   },
-
   right: {
     display: "flex",
     alignItems: "center",
-    gap: "18px",
+    gap: "14px",
+    flexShrink: 0,
   },
-
+  dateBox: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    padding: "10px 14px",
+    borderRadius: "14px",
+    background: "#f8fbff",
+    border: "1px solid #e2e8f0",
+    color: "#334155",
+  },
+  dateIcon: {
+    color: "#2563eb",
+    fontSize: "14px",
+  },
+  dateText: {
+    fontSize: "13px",
+    fontWeight: 700,
+    color: "#0f172a",
+    whiteSpace: "nowrap",
+  },
   bell: {
     width: "42px",
     height: "42px",
@@ -160,7 +202,6 @@ const styles = {
     fontSize: "16px",
     color: "#475569",
   },
-
   dot: {
     width: "8px",
     height: "8px",
@@ -171,16 +212,16 @@ const styles = {
     right: "9px",
     border: "2px solid #fff",
   },
-
   profile: {
     display: "flex",
     alignItems: "center",
     gap: "12px",
     cursor: "pointer",
-    padding: "8px 10px",
+    padding: "8px 12px",
     borderRadius: "16px",
+    background: "#fff",
+    border: "1px solid #eef2f7",
   },
-
   avatar: {
     width: "46px",
     height: "46px",
@@ -195,14 +236,12 @@ const styles = {
     border: "3px solid rgba(59, 130, 246, 0.18)",
     boxShadow: "0 8px 18px rgba(37, 99, 235, 0.18)",
   },
-
   name: {
     margin: 0,
     fontSize: "14px",
-    fontWeight: "700",
+    fontWeight: 700,
     color: "#0f172a",
   },
-
   role: {
     margin: 0,
     fontSize: "12px",

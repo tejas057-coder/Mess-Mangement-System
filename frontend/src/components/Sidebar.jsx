@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   FaHome,
   FaUsers,
@@ -5,91 +6,181 @@ import {
   FaMoneyBill,
   FaCog,
   FaSignOutAlt,
+  FaBars,
+  FaTimes,
 } from "react-icons/fa";
 import { NavLink } from "react-router-dom";
 
 function Sidebar() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [screenSize, setScreenSize] = useState(getScreenSize());
+
+  function getScreenSize() {
+    if (window.innerWidth < 768) return "mobile";
+    if (window.innerWidth < 1024) return "tablet";
+    return "desktop";
+  }
+
+  useEffect(() => {
+    const handleResize = () => {
+      const nextScreen = getScreenSize();
+      setScreenSize(nextScreen);
+
+      if (nextScreen !== "mobile") {
+        setIsOpen(false);
+      }
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (screenSize === "mobile" && isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [screenSize, isOpen]);
+
   const menuItems = [
-    {
-      name: "Dashboard",
-      icon: <FaHome />,
-      path: "/",
-    },
-    {
-      name: "Members",
-      icon: <FaUsers />,
-      path: "/members",
-    },
-    {
-      name: "Attendance",
-      icon: <FaCalendarAlt />,
-      path: "/attendance",
-    },
-    {
-      name: "Billing",
-      icon: <FaMoneyBill />,
-      path: "/billing",
-    },
-    {
-      name: "Settings",
-      icon: <FaCog />,
-      path: "/settings",
-    },
+    { name: "Dashboard", icon: <FaHome />, path: "/" },
+    { name: "Members", icon: <FaUsers />, path: "/members" },
+    { name: "Attendance", icon: <FaCalendarAlt />, path: "/attendance" },
+    { name: "Billing", icon: <FaMoneyBill />, path: "/billing" },
+    { name: "Settings", icon: <FaCog />, path: "/settings" },
   ];
+
+  const isMobile = screenSize === "mobile";
+  const isTablet = screenSize === "tablet";
+
+  const handleLinkClick = () => {
+    if (isMobile) setIsOpen(false);
+  };
+
+  const sidebarDynamicStyle = {
+    ...styles.sidebar,
+    ...(isMobile
+      ? {
+        position: "fixed",
+        top: 0,
+        left: 0,
+        transform: isOpen ? "translateX(0)" : "translateX(-100%)",
+        boxShadow: "8px 0 30px rgba(15, 23, 42, 0.18)",
+      }
+      : isTablet
+        ? styles.sidebarTablet
+        : styles.sidebarDesktop),
+  };
 
   return (
     <>
-      <style>
-        {`
-          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-        `}
-      </style>
+      <button
+        type="button"
+        onClick={() => setIsOpen(true)}
+        style={{
+          ...styles.mobileToggle,
+          display: isMobile ? "flex" : "none",
+        }}
+        aria-label="Open sidebar"
+      >
+        <FaBars />
+      </button>
 
-      <aside style={styles.sidebar}>
+      <div
+        onClick={() => setIsOpen(false)}
+        style={{
+          ...styles.backdrop,
+          opacity: isMobile && isOpen ? 1 : 0,
+          pointerEvents: isMobile && isOpen ? "auto" : "none",
+        }}
+      />
+
+      <aside style={sidebarDynamicStyle}>
         <div style={styles.topSection}>
-          <div style={styles.brandWrap}>
-            <div style={styles.logoIcon}>🍽</div>
-            <div>
-              <h2 style={styles.logoText}>MessMate</h2>
-              <p style={styles.logoSubtext}>Mess Management</p>
+          {isMobile && (
+            <div style={styles.mobileHeader}>
+              <div style={styles.brandWrap}>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                style={styles.closeBtn}
+                aria-label="Close sidebar"
+              >
+                <FaTimes />
+              </button>
             </div>
+          )}
+
+          <div
+            style={{
+              ...styles.brandWrapDesktop,
+              ...(isTablet ? styles.brandWrapDesktopTablet : {}),
+            }}
+          >
+            <div style={styles.logoIcon}>🍽</div>
+
+            {!isTablet && (
+              <div>
+                <h2 style={styles.logoText}>MessMate</h2>
+                <p style={styles.logoSubtext}>Mess Management</p>
+              </div>
+            )}
           </div>
 
-          <div style={styles.sectionLabel}>Main Menu</div>
+          {!isTablet && <div style={styles.sectionLabel}>Main Menu</div>}
 
           <nav style={styles.menu}>
             {menuItems.map((item) => (
               <NavLink
                 key={item.name}
                 to={item.path}
+                onClick={handleLinkClick}
                 style={({ isActive }) => ({
                   ...styles.item,
+                  ...(isTablet ? styles.itemTablet : {}),
                   ...(isActive ? styles.active : {}),
                   textDecoration: "none",
                   color: isActive ? "#ffffff" : "#475569",
+                  justifyContent: isTablet ? "center" : "flex-start",
                 })}
               >
                 <span style={styles.iconWrap}>{item.icon}</span>
-                <span style={styles.itemText}>{item.name}</span>
+                {!isTablet && <span style={styles.itemText}>{item.name}</span>}
               </NavLink>
             ))}
           </nav>
         </div>
 
         <div style={styles.bottomArea}>
-          <div style={styles.profileCard}>
-            <div style={styles.profileAvatar}>M</div>
-            <div style={styles.profileInfo}>
-              <p style={styles.profileName}>Mess Admin</p>
-              <span style={styles.profileRole}>Administrator</span>
+          {!isTablet && (
+            <div style={styles.profileCard}>
+              <div style={styles.profileAvatar}>M</div>
+              <div style={styles.profileInfo}>
+                <p style={styles.profileName}>Mess Admin</p>
+                <span style={styles.profileRole}>Administrator</span>
+              </div>
             </div>
-          </div>
+          )}
 
-          <button style={styles.logout}>
+          <button
+            style={{
+              ...styles.logout,
+              ...(isTablet ? styles.logoutTablet : {}),
+            }}
+            type="button"
+          >
             <span style={styles.logoutIcon}>
               <FaSignOutAlt />
             </span>
-            <span>Logout</span>
+            {!isTablet && <span>Logout</span>}
           </button>
         </div>
       </aside>
@@ -97,55 +188,135 @@ function Sidebar() {
   );
 }
 
+export default Sidebar;
+
 const styles = {
+  mobileToggle: {
+    position: "fixed",
+    top: "16px",
+    left: "16px",
+    zIndex: 1300,
+    width: "44px",
+    height: "44px",
+    borderRadius: "12px",
+    border: "1px solid #e2e8f0",
+    background: "#ffffff",
+    boxShadow: "0 8px 24px rgba(15, 23, 42, 0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    fontSize: "16px",
+    color: "#0f172a",
+  },
+
+  backdrop: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(15, 23, 42, 0.5)",
+    zIndex: 1190,
+    transition: "opacity 0.25s ease",
+  },
+
   sidebar: {
     width: "280px",
-    height: "100vh",
-    position: "sticky",
-    top: 0,
+    minWidth: "280px",
+    height: "100dvh",
     background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)",
-    borderRight: "1px solid #e5edf5",
+    borderRight: "1px solid #e2e8f0",
     display: "flex",
     flexDirection: "column",
     justifyContent: "space-between",
-    padding: "20px 16px 16px",
-    boxSizing: "border-box",
-    boxShadow: "4px 0 20px rgba(15, 23, 42, 0.04)",
+    padding: "18px 16px",
+    overflowY: "auto",
+    overflowX: "hidden",
+    zIndex: 1200,
+    transition: "transform 0.3s ease, width 0.3s ease, min-width 0.3s ease",
     fontFamily: "'Inter', sans-serif",
+    flexShrink: 0,
+  },
+
+  sidebarDesktop: {
+    position: "sticky",
+    top: 0,
+  },
+
+  sidebarTablet: {
+    position: "sticky",
+    top: 0,
+    width: "88px",
+    minWidth: "88px",
+    padding: "20px 12px",
   },
 
   topSection: {
+    flex: 1,
     minHeight: 0,
+  },
+
+  mobileHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+    marginBottom: "16px",
   },
 
   brandWrap: {
     display: "flex",
     alignItems: "center",
-    gap: "14px",
-    padding: "10px 10px 24px 10px",
+    gap: "12px",
+  },
+
+  brandWrapDesktop: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    padding: "8px 8px 20px",
     borderBottom: "1px solid #edf2f7",
     marginBottom: "20px",
   },
 
+  brandWrapDesktopTablet: {
+    justifyContent: "center",
+    padding: "8px 0 12px",
+    borderBottom: "none",
+  },
+
+  closeBtn: {
+    width: "40px",
+    height: "40px",
+    borderRadius: "12px",
+    border: "1px solid #e2e8f0",
+    background: "#ffffff",
+    cursor: "pointer",
+    color: "#475569",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "16px",
+    flexShrink: 0,
+  },
+
   logoIcon: {
-    width: "50px",
-    height: "50px",
-    borderRadius: "16px",
+    width: "48px",
+    height: "48px",
+    borderRadius: "14px",
     background: "linear-gradient(135deg, #2563eb, #3b82f6)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     fontSize: "22px",
-    boxShadow: "0 12px 24px rgba(37, 99, 235, 0.18)",
+    color: "#ffffff",
     flexShrink: 0,
+    boxShadow: "0 10px 24px rgba(37, 99, 235, 0.2)",
   },
 
   logoText: {
     margin: 0,
-    fontSize: "22px",
+    fontSize: "20px",
     fontWeight: 800,
     color: "#0f172a",
-    lineHeight: 1.15,
+    lineHeight: 1.1,
     letterSpacing: "-0.02em",
   },
 
@@ -179,10 +350,14 @@ const styles = {
     padding: "14px",
     borderRadius: "14px",
     cursor: "pointer",
-    fontSize: "15px",
+    fontSize: "14px",
     fontWeight: 600,
     transition: "all 0.25s ease",
     background: "transparent",
+  },
+
+  itemTablet: {
+    padding: "14px 10px",
   },
 
   iconWrap: {
@@ -196,6 +371,7 @@ const styles = {
 
   itemText: {
     flex: 1,
+    whiteSpace: "nowrap",
   },
 
   active: {
@@ -205,11 +381,10 @@ const styles = {
   },
 
   bottomArea: {
-    position: "sticky",
-    bottom: 0,
-    background: "linear-gradient(180deg, rgba(248,251,255,0) 0%, #f8fbff 18%, #f8fbff 100%)",
+    flexShrink: 0,
     paddingTop: "18px",
     marginTop: "18px",
+    borderTop: "1px solid #edf2f7",
   },
 
   profileCard: {
@@ -217,17 +392,17 @@ const styles = {
     alignItems: "center",
     gap: "12px",
     background: "#ffffff",
-    border: "1px solid #e5edf5",
-    borderRadius: "18px",
+    border: "1px solid #e2e8f0",
+    borderRadius: "16px",
     padding: "12px",
     marginBottom: "12px",
     boxShadow: "0 6px 18px rgba(15, 23, 42, 0.05)",
   },
 
   profileAvatar: {
-    width: "46px",
-    height: "46px",
-    borderRadius: "14px",
+    width: "44px",
+    height: "44px",
+    borderRadius: "12px",
     background: "linear-gradient(135deg, #0f172a, #334155)",
     color: "#ffffff",
     display: "flex",
@@ -236,7 +411,6 @@ const styles = {
     fontWeight: 800,
     fontSize: "16px",
     flexShrink: 0,
-    boxShadow: "0 8px 20px rgba(15, 23, 42, 0.16)",
   },
 
   profileInfo: {
@@ -278,6 +452,10 @@ const styles = {
     boxShadow: "0 6px 16px rgba(220, 38, 38, 0.08)",
   },
 
+  logoutTablet: {
+    padding: "14px",
+  },
+
   logoutIcon: {
     display: "flex",
     alignItems: "center",
@@ -285,5 +463,3 @@ const styles = {
     fontSize: "15px",
   },
 };
-
-export default Sidebar;

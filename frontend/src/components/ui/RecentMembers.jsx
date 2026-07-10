@@ -6,22 +6,29 @@ const RecentMembers = () => {
 
   useEffect(() => {
     fetch("http://localhost:5000/members")
-      .then((res) => res.json())
-      .then((data) => setMembers(data))
-      .catch((err) => console.log(err));
+      .then((res) => {
+        console.log("Response status:", res.status);
+        return res.json();
+      })
+      .then((data) => {
+        console.log("Database data:", data);
+        setMembers(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => console.log("Fetch error:", err));
   }, []);
 
-  const sortedMembers = [...members].sort(
-    (a, b) =>
-      new Date(b.starting_date || b.startingDate).getTime() -
-      new Date(a.starting_date || a.startingDate).getTime()
-  );
+  const sortedMembers = [...members].sort((a, b) => {
+    const dateA = new Date(a.starting_date || a.startingDate || 0).getTime();
+    const dateB = new Date(b.starting_date || b.startingDate || 0).getTime();
+    return dateB - dateA;
+  });
 
   const visibleMembers = showAll ? sortedMembers : sortedMembers.slice(0, 4);
 
   const getInitials = (name = "") =>
     name
       .split(" ")
+      .filter(Boolean)
       .map((part) => part[0])
       .join("")
       .slice(0, 2)
@@ -51,6 +58,7 @@ const RecentMembers = () => {
               <th style={styles.th}>S.No</th>
               <th style={styles.th}>Member Name</th>
               <th style={styles.th}>Phone Number</th>
+              <th style={styles.th}>Amount Remain</th>
               <th style={styles.th}>Starting Date</th>
             </tr>
           </thead>
@@ -69,13 +77,12 @@ const RecentMembers = () => {
                   </div>
                 </td>
 
-                <td style={styles.td}>{member.phone}</td>
+                <td style={styles.td}>{member.phone || "-"}</td>
+                <td style={styles.td}>₹ {member.amount_remain || 0}</td>
 
                 <td style={styles.td}>
                   {member.starting_date || member.startingDate
-                    ? new Date(
-                      member.starting_date || member.startingDate
-                    ).toLocaleDateString("en-IN", {
+                    ? new Date(member.starting_date || member.startingDate).toLocaleDateString("en-IN", {
                       day: "2-digit",
                       month: "short",
                       year: "numeric",

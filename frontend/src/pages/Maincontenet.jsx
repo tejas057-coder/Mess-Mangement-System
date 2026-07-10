@@ -1,12 +1,36 @@
-import React from 'react'
-import Navbar from '../components/Navbar'
+import React from "react";
+import Navbar from "../components/Navbar";
+import { Outlet } from "react-router-dom";
 
 const Maincontenet = () => {
   return (
-    <div>
+    <div style={styles.right}>
       <Navbar />
+      <div style={styles.content}>
+        <Outlet />
+      </div>
     </div>
-  )
-}
+  );
+};
 
-export default Maincontenet
+const styles = {
+  right: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+    height: "100dvh",
+    overflow: "hidden",
+    minWidth: 0,
+  },
+  content: {
+    flex: 1,
+    overflowY: "auto",
+    overflowX: "hidden",
+    scrollBehavior: "smooth",
+    padding: "24px",
+    WebkitOverflowScrolling: "touch",
+    minWidth: 0,
+  },
+};
+
+export default Maincontenet;
