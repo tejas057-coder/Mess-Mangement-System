@@ -1,0 +1,347 @@
+/* =============================================
+   CSS VARIABLES — DESIGN TOKENS
+   Accent vars are overridden by ThemeContext JS
+   ============================================= */
+
+:root {
+  /* Accent palette — JS overrides these */
+  --accent:        #2563eb;
+  --accent-dark:   #1d4ed8;
+  --accent-light:  #eff6ff;
+  --accent-shadow: rgba(37, 99, 235, 0.22);
+
+  /* Light Theme (default) */
+  --bg:           radial-gradient(at 0% 0%, #e0e7ff 0px, transparent 50%), radial-gradient(at 100% 100%, #eff6ff 0px, transparent 50%), #f1f5f9;
+  --bg-card:      rgba(255, 255, 255, 0.7);
+  --bg-input:     rgba(248, 250, 252, 0.8);
+  --bg-hover:     rgba(241, 245, 249, 0.9);
+  --bg-elevated:  rgba(238, 242, 255, 0.85);
+
+  --text:         #0f172a;
+  --text-2:       #334155;
+  --text-3:       #64748b;
+  --text-4:       #94a3b8;
+
+  --border:       rgba(226, 232, 240, 0.8);
+  --border-2:     rgba(241, 245, 249, 0.6);
+  --border-3:     rgba(237, 242, 247, 0.7);
+
+  --sidebar-bg:   rgba(255, 255, 255, 0.6);
+  --nav-bg:       rgba(255, 255, 255, 0.65);
+  --nav-border:   rgba(226, 232, 240, 0.5);
+
+  --shadow-sm:    0 2px 8px rgba(15, 23, 42, 0.04);
+  --shadow-md:    0 12px 30px rgba(15, 23, 42, 0.08);
+  --shadow-lg:    0 24px 50px rgba(15, 23, 42, 0.12);
+  --glass-blur:   blur(14px) saturate(120%);
+}
+
+/* Dark Theme */
+[data-theme="dark"] {
+  --bg:           radial-gradient(at 0% 0%, #1e1b4b 0px, transparent 50%), radial-gradient(at 100% 100%, #064e3b 0px, transparent 50%), #0d1117;
+  --bg-card:      rgba(22, 27, 34, 0.65);
+  --bg-input:     rgba(13, 17, 23, 0.8);
+  --bg-hover:     rgba(28, 33, 41, 0.9);
+  --bg-elevated:  rgba(33, 38, 45, 0.85);
+
+  --text:         #e6edf3;
+  --text-2:       #c9d1d9;
+  --text-3:       #8b949e;
+  --text-4:       #6e7681;
+
+  --border:       rgba(48, 54, 61, 0.7);
+  --border-2:     rgba(33, 38, 45, 0.5);
+  --border-3:     rgba(28, 33, 41, 0.6);
+
+  --sidebar-bg:   rgba(22, 27, 34, 0.6);
+  --nav-bg:       rgba(22, 27, 34, 0.65);
+  --nav-border:   rgba(48, 54, 61, 0.5);
+
+  --shadow-sm:    0 2px 8px rgba(0, 0, 0, 0.2);
+  --shadow-md:    0 12px 30px rgba(0, 0, 0, 0.35);
+  --shadow-lg:    0 24px 50px rgba(0, 0, 0, 0.5);
+  --glass-blur:   blur(14px) saturate(120%);
+}
+
+/* =============================================
+   GLOBAL RESET & BASE
+   ============================================= */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', 'Nunito Sans', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+img, video { max-width: 100%; height: auto; display: block; }
+button     { font-family: inherit; cursor: pointer; }
+input, select, textarea { font-family: inherit; }
+
+/* =============================================
+   APP SHELL LAYOUT
+   ============================================= */
+
+.app-layout {
+  display: flex;
+  min-height: 100dvh;
+  background: var(--bg);
+  transition: background 0.3s ease;
+}
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  transition: background 0.3s ease;
+}
+
+/* =============================================
+   RESPONSIVE GRID UTILITIES
+   ============================================= */
+
+.page-wrapper { padding: 24px; min-height: 100vh; }
+
+/* 4-column stat grids */
+.grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+
+/* 2-column content grids */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+/* Billing content: 3fr + fixed sidebar */
+.grid-billing {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) 300px;
+  gap: 18px;
+  align-items: start;
+}
+
+/* Settings layout: sidebar + content */
+.grid-settings {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+/* 2-col form grid */
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+/* =============================================
+   DARK MODE — STRUCTURAL OVERRIDES
+   ============================================= */
+
+[data-theme="dark"] .app-layout,
+[data-theme="dark"] .app-main {
+  background: var(--bg);
+}
+
+/* =============================================
+   MEMBERS MODAL
+   ============================================= */
+
+.members-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1500;
+  padding: 16px;
+  overflow-y: auto;
+  backdrop-filter: blur(4px);
+}
+
+[data-theme="dark"] .members-modal {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.members-modal-inner {
+  background: var(--bg-card);
+  border-radius: 24px;
+  padding: 28px;
+  width: 100%;
+  max-width: 700px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border);
+}
+
+/* =============================================
+   SETTINGS TABS (mobile)
+   ============================================= */
+
+.settings-tabs-mobile { display: none; }
+
+/* =============================================
+   BILLING MOBILE SWITCH
+   ============================================= */
+
+@media (max-width: 640px) {
+  .billing-table-wrap  { display: none !important; }
+  .billing-mobile-cards { display: block !important; }
+}
+
+/* =============================================
+   SPINNER ANIMATION
+   ============================================= */
+
+@keyframes spin {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.spinner { animation: spin 0.9s linear infinite; }
+
+/* =============================================
+   ATTENDANCE CARD HOVER
+   ============================================= */
+
+.attendance-grid > * {
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.attendance-grid > *:hover {
+  transform: translateY(-3px) scale(1.01);
+}
+
+/* =============================================
+   GLOBAL MICRO-INTERACTIONS
+   ============================================= */
+
+button:not([disabled]):hover { filter: brightness(1.07); }
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Card hover lift utility */
+.hover-lift { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.hover-lift:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+
+/* =============================================
+   TOASTIFY OVERRIDES
+   ============================================= */
+
+.Toastify__toast {
+  border-radius: 14px !important;
+  font-family: inherit !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  background: var(--bg-card) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+/* =============================================
+   SCROLLBAR STYLING
+   ============================================= */
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-4); }
+
+/* =============================================
+   BREAKPOINTS
+   ============================================= */
+
+/* Tablet (≤1024px) */
+@media (max-width: 1024px) {
+  .grid-billing { grid-template-columns: 1fr; }
+  .grid-2       { grid-template-columns: 1fr; }
+}
+
+/* Small tablet / Mobile (≤768px) */
+@media (max-width: 768px) {
+  .page-wrapper { padding: 16px; }
+
+  .grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .grid-2       { grid-template-columns: 1fr; gap: 16px; }
+  .grid-billing { grid-template-columns: 1fr; gap: 16px; }
+
+  .grid-settings {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .grid-settings > *:first-child { display: none; }
+
+  .settings-tabs-mobile {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+    margin-bottom: 16px;
+    scrollbar-width: none;
+  }
+  .settings-tabs-mobile::-webkit-scrollbar { display: none; }
+
+  .form-grid-2  { grid-template-columns: 1fr; gap: 14px; }
+  .members-modal-inner { padding: 20px 16px; border-radius: 18px; }
+  .app-main { padding: 0; }
+}
+
+/* Phone (≤480px) */
+@media (max-width: 480px) {
+  .page-wrapper { padding: 12px; }
+  .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .members-modal-inner { padding: 16px 12px; border-radius: 16px; max-height: 95vh; }
+  .form-grid-2 { grid-template-columns: 1fr; gap: 12px; }
+}
+
+@media (max-width: 640px) {
+  nav { padding-left: 60px !important; }
+  .recent-table-wrap { display: none !important; }
+  .recent-mobile-cards { display: block !important; }
+  .members-table-wrap { display: none !important; }
+  .members-mobile-list { display: block !important; }
+}
+
+/* Hide recent mobile cards by default on desktop */
+.recent-mobile-cards,
+.members-mobile-list {
+  display: none;
+}
+
+

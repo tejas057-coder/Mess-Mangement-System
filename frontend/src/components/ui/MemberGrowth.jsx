@@ -1,13 +1,6 @@
-import {
-  LineChart,
-  Line,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-} from "recharts";
+import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, Area, AreaChart } from "recharts";
 import { useEffect, useState } from "react";
+import { useTheme } from "../../context/ThemeContext";
 
 const data = [
   { month: "Jan", members: 75 },
@@ -19,261 +12,135 @@ const data = [
   { month: "Jul", members: 128 },
 ];
 
-const CustomTooltip = ({ active, payload, label }) => {
-  if (active && payload && payload.length) {
-    return (
-      <div style={styles.tooltip}>
-        <p style={styles.tooltipLabel}>{label}</p>
-        <p style={styles.tooltipValue}>{payload[0].value} Active Members</p>
-      </div>
-    );
-  }
-  return null;
-};
-
 const MemberGrowth = () => {
+  const { accent, isDark } = useTheme();
   const [animate, setAnimate] = useState(false);
+  const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
-    const t = setTimeout(() => setAnimate(true), 150);
+    const t = setTimeout(() => setAnimate(true), 350);
     return () => clearTimeout(t);
   }, []);
 
+  const gridColor  = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)";
+  const tickColor  = isDark ? "#6e7681" : "#94a3b8";
+
   return (
     <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
-        ...styles.growthCard,
-        transform: animate ? "translateY(0px)" : "translateY(14px)",
+        background: "var(--bg-card)",
+        backdropFilter: "var(--glass-blur)",
+        WebkitBackdropFilter: "var(--glass-blur)",
+        border: "1px solid var(--border)",
+        borderRadius: 24,
+        padding: 24,
+        position: "relative",
+        overflow: "hidden",
+        transition: "all 0.45s cubic-bezier(.34,1.56,.64,1)",
+        transform: animate ? (hovered ? "translateY(-4px)" : "translateY(0)") : "translateY(16px)",
         opacity: animate ? 1 : 0,
+        boxShadow: hovered
+          ? `var(--shadow-lg), 0 0 0 1px rgba(255,255,255,0.08) inset`
+          : "var(--shadow-md)",
       }}
     >
-      <div style={styles.glow1}></div>
-      <div style={styles.glow2}></div>
+      {/* Glass top-sheen */}
+      <div style={{
+        position: "absolute", top: 0, left: 0, right: 0, height: "50%",
+        background: "linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 100%)",
+        pointerEvents: "none", borderRadius: "24px 24px 0 0",
+      }} />
 
-      <div style={styles.growthHeader}>
+      {/* Decorative glow blobs */}
+      <div style={{ position: "absolute", width: 180, height: 180, borderRadius: "50%", background: `${accent.hex}20`, filter: "blur(36px)", top: -60, right: -40, pointerEvents: "none" }} />
+      <div style={{ position: "absolute", width: 120, height: 120, borderRadius: "50%", background: `${accent.dark}18`, filter: "blur(28px)", bottom: -40, left: -20, pointerEvents: "none" }} />
+
+      {/* Header */}
+      <div style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 16 }}>
         <div>
-          <p style={styles.badgeText}>Performance overview</p>
-          <h3 style={styles.growthHeaderTitle}>Member Growth</h3>
-          <p style={styles.growthHeaderText}>Monthly active members trend</p>
+          <p style={{ margin: 0, fontSize: 10, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-4)" }}>Performance</p>
+          <h3 style={{ margin: "4px 0 0", fontSize: 20, fontWeight: 900, color: "var(--text)", letterSpacing: "-0.03em" }}>Member Growth</h3>
+          <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--text-3)" }}>Monthly active members</p>
         </div>
 
-        <span style={styles.growthBadge}>+42%</span>
+        <span style={{
+          background: isDark ? "rgba(34,197,94,0.15)" : "#dcfce7",
+          color: "#15803d", padding: "6px 12px", borderRadius: 999,
+          fontSize: 12, fontWeight: 800, border: "1px solid rgba(34,197,94,0.25)",
+          whiteSpace: "nowrap", backdropFilter: "blur(8px)",
+        }}>
+          +42% ↑
+        </span>
       </div>
 
-      <div style={styles.numberRow}>
-        <h1 style={styles.growthNumber}>128</h1>
-        <span style={styles.growthUp}>▲ 15 this month</span>
+      {/* Big number */}
+      <div style={{ position: "relative", display: "flex", alignItems: "baseline", gap: 10, marginBottom: 4 }}>
+        <span style={{
+          fontSize: 48, fontWeight: 900, lineHeight: 1, letterSpacing: "-0.05em",
+          background: `linear-gradient(135deg, ${accent.hex}, ${accent.dark})`,
+          WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+        }}>128</span>
+        <span style={{
+          fontSize: 12, fontWeight: 700, color: accent.hex,
+          background: accent.light, border: `1px solid ${accent.hex}22`,
+          borderRadius: 999, padding: "5px 10px",
+        }}>
+          ▲ 15 this month
+        </span>
       </div>
+      <p style={{ margin: "4px 0 16px", fontSize: 13, color: "var(--text-3)" }}>Active Members</p>
 
-      <p style={styles.growthText}>Active Members</p>
-
-      <div style={styles.chartContainer}>
-        <ResponsiveContainer width="100%" height={220}>
-          <LineChart data={data}>
+      {/* Chart */}
+      <div style={{
+        width: "100%", height: 200,
+        background: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)",
+        borderRadius: 18,
+        border: "1px solid var(--border-2)",
+        padding: "8px 4px 0",
+        position: "relative",
+        backdropFilter: "blur(4px)",
+      }}>
+        <ResponsiveContainer width="100%" height={192}>
+          <AreaChart data={data}>
             <defs>
-              <linearGradient id="lineColor" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="#2563eb" />
-                <stop offset="50%" stopColor="#7c3aed" />
-                <stop offset="100%" stopColor="#06b6d4" />
+              <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%"   stopColor={accent.hex} />
+                <stop offset="100%" stopColor={accent.dark} />
               </linearGradient>
-              <linearGradient id="areaColor" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#2563eb" stopOpacity={0.28} />
-                <stop offset="100%" stopColor="#2563eb" stopOpacity={0} />
+              <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%"   stopColor={accent.hex} stopOpacity={0.25} />
+                <stop offset="100%" stopColor={accent.hex} stopOpacity={0} />
               </linearGradient>
             </defs>
-
-            <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" vertical={false} />
-            <XAxis
-              dataKey="month"
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: "#64748b", fontSize: 12 }}
-            />
-            <YAxis
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: "#64748b", fontSize: 12 }}
-            />
-            <Tooltip content={<CustomTooltip />} />
-
-            <Line
-              type="monotone"
-              dataKey="members"
-              stroke="url(#lineColor)"
-              strokeWidth={3}
-              dot={{ r: 4, strokeWidth: 2, fill: "#fff", stroke: "#2563eb" }}
-              activeDot={{
-                r: 7,
-                fill: "#2563eb",
-                stroke: "#fff",
-                strokeWidth: 3,
+            <CartesianGrid strokeDasharray="4 4" stroke={gridColor} vertical={false} />
+            <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: tickColor, fontSize: 11 }} />
+            <YAxis axisLine={false} tickLine={false} tick={{ fill: tickColor, fontSize: 11 }} />
+            <Tooltip
+              contentStyle={{
+                background: isDark ? "rgba(13,17,23,0.9)" : "rgba(15,23,42,0.92)",
+                border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14,
+                boxShadow: "0 20px 48px rgba(0,0,0,0.35)",
+                backdropFilter: "blur(16px)",
               }}
-              isAnimationActive={true}
-              animationDuration={1400}
-              animationEasing="ease-in-out"
+              labelStyle={{ color: "#94a3b8", fontSize: 11, fontWeight: 700 }}
+              itemStyle={{ color: "#fff", fontSize: 13, fontWeight: 800 }}
+              formatter={(v) => [`${v} members`, ""]}
             />
-          </LineChart>
+            <Area
+              type="monotone" dataKey="members"
+              stroke={`url(#lineGrad)`} strokeWidth={2.5}
+              fill="url(#areaFill)"
+              dot={{ r: 4, fill: "var(--bg-card)", stroke: accent.hex, strokeWidth: 2 }}
+              activeDot={{ r: 7, fill: accent.hex, stroke: "var(--bg-card)", strokeWidth: 2 }}
+              isAnimationActive animationDuration={1600} animationEasing="ease-in-out"
+            />
+          </AreaChart>
         </ResponsiveContainer>
       </div>
     </div>
   );
-};
-
-const styles = {
-  growthCard: {
-    position: "relative",
-    overflow: "hidden",
-    background: "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, #f8fbff 100%)",
-    padding: "24px",
-    borderRadius: "24px",
-    border: "1px solid rgba(226, 232, 240, 0.9)",
-    boxShadow: "0 12px 28px rgba(15, 23, 42, 0.08)",
-    transition: "all 0.5s ease",
-  },
-
-  glow1: {
-    position: "absolute",
-    width: "180px",
-    height: "180px",
-    borderRadius: "50%",
-    background: "rgba(37, 99, 235, 0.12)",
-    filter: "blur(30px)",
-    top: "-60px",
-    right: "-40px",
-    pointerEvents: "none",
-  },
-
-  glow2: {
-    position: "absolute",
-    width: "140px",
-    height: "140px",
-    borderRadius: "50%",
-    background: "rgba(124, 58, 237, 0.10)",
-    filter: "blur(26px)",
-    bottom: "-40px",
-    left: "-30px",
-    pointerEvents: "none",
-  },
-
-  growthHeader: {
-    position: "relative",
-    zIndex: 1,
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: "16px",
-  },
-
-  badgeText: {
-    margin: 0,
-    fontSize: "12px",
-    fontWeight: 700,
-    letterSpacing: "0.08em",
-    textTransform: "uppercase",
-    color: "#94a3b8",
-  },
-
-  growthHeaderTitle: {
-    margin: "6px 0 0",
-    fontSize: "22px",
-    fontWeight: 800,
-    color: "#0f172a",
-    letterSpacing: "-0.03em",
-  },
-
-  growthHeaderText: {
-    color: "#64748b",
-    marginTop: "6px",
-    marginBottom: 0,
-    fontSize: "13px",
-  },
-
-  growthBadge: {
-    background: "linear-gradient(135deg, #dcfce7, #bbf7d0)",
-    color: "#15803d",
-    padding: "8px 14px",
-    borderRadius: "999px",
-    fontWeight: 800,
-    fontSize: "13px",
-    border: "1px solid rgba(34,197,94,0.18)",
-    boxShadow: "0 8px 18px rgba(34,197,94,0.12)",
-    position: "relative",
-    zIndex: 1,
-  },
-
-  numberRow: {
-    position: "relative",
-    zIndex: 1,
-    display: "flex",
-    alignItems: "baseline",
-    gap: "12px",
-    marginTop: "18px",
-  },
-
-  growthNumber: {
-    margin: 0,
-    fontSize: "48px",
-    lineHeight: 1,
-    fontWeight: 900,
-    color: "#0f172a",
-    letterSpacing: "-0.05em",
-    background: "linear-gradient(135deg, #2563eb, #7c3aed)",
-    WebkitBackgroundClip: "text",
-    WebkitTextFillColor: "transparent",
-  },
-
-  growthUp: {
-    fontSize: "13px",
-    fontWeight: 700,
-    color: "#2563eb",
-    background: "#eff6ff",
-    border: "1px solid rgba(37,99,235,0.14)",
-    padding: "6px 10px",
-    borderRadius: "999px",
-  },
-
-  growthText: {
-    position: "relative",
-    zIndex: 1,
-    color: "#64748b",
-    margin: "8px 0 18px",
-    fontSize: "14px",
-    fontWeight: 500,
-  },
-
-  chartContainer: {
-    position: "relative",
-    zIndex: 1,
-    width: "100%",
-    height: "220px",
-    background: "linear-gradient(180deg, rgba(255,255,255,0.65), rgba(248,251,255,0.75))",
-    border: "1px solid rgba(226,232,240,0.8)",
-    borderRadius: "18px",
-    padding: "8px 8px 0",
-  },
-
-  tooltip: {
-    background: "rgba(15, 23, 42, 0.96)",
-    color: "#fff",
-    padding: "10px 12px",
-    borderRadius: "12px",
-    boxShadow: "0 16px 30px rgba(15,23,42,0.22)",
-    border: "1px solid rgba(255,255,255,0.08)",
-  },
-
-  tooltipLabel: {
-    margin: 0,
-    fontSize: "12px",
-    color: "#cbd5e1",
-    fontWeight: 700,
-  },
-
-  tooltipValue: {
-    margin: "4px 0 0",
-    fontSize: "13px",
-    fontWeight: 800,
-    color: "#fff",
-  },
 };
 
 export default MemberGrowth;
