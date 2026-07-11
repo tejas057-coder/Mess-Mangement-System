@@ -16,8 +16,26 @@ const razorpay = new Razorpay({
 // Raw body parser needed ONLY for webhook signature verification
 app.use("/webhook/razorpay", express.raw({ type: "application/json" }));
 
-app.use(cors());
+const allowedOrigins = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
+    "http://localhost:3000",
+    "https://mess-mangement-system.vercel.app",
+    process.env.FRONTEND_URL,  // extra override from env if needed
+].filter(Boolean);
+
+app.use(cors({
+    origin: function (origin, callback) {
+        // Allow requests with no origin (mobile apps, curl, Postman)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        callback(new Error("CORS: origin not allowed — " + origin));
+    },
+    credentials: true,
+}));
 app.use(express.json());
+
 
 // Initialize database tables
 const initDB = () => {

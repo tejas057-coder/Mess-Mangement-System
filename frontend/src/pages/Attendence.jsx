@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useTheme } from "../context/ThemeContext";
+import API_BASE from "../api";
 
 const MEALS          = ["Breakfast", "Lunch", "Dinner"];
 const STATUS_OPTIONS = ["Present", "Absent", "Leave"];
@@ -77,7 +78,7 @@ export default function Attendance() {
   const [visible,    setVisible]    = useState(false);
 
   useEffect(() => {
-    fetch("http://localhost:5000/members")
+    fetch(`${API_BASE}/members`)
       .then(r => r.json())
       .then(d => { setMembers(Array.isArray(d) ? d : []); setLoading(false); })
       .catch(() => setLoading(false));

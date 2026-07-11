@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTheme } from "../../context/ThemeContext";
+import API_BASE from "../../api";
 
 const GRADIENTS = [
   "linear-gradient(135deg,#2563eb,#7c3aed)",
@@ -15,7 +16,7 @@ const RecentMembers = () => {
   const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
-    fetch("http://localhost:5000/members")
+    fetch(`${API_BASE}/members`)
       .then(r => r.json())
       .then(d => setMembers(Array.isArray(d) ? d : []))
       .catch(() => {});

@@ -3,6 +3,7 @@ import BillingTable from "../components/ui/BillingTable.jsx";
 import { useTheme } from "../context/ThemeContext";
 import { toast } from "react-toastify";
 import ImageWithFallback from "../components/ImageWithFallback.jsx";
+import API_BASE from "../api";
 
 // Load Razorpay checkout.js script dynamically
 function loadRazorpayScript() {
@@ -285,7 +286,7 @@ export default function Billing() {
     // Create order on our backend
     let orderData;
     try {
-      const orderRes = await fetch("http://localhost:5000/payments/create-order", {
+      const orderRes = await fetch(`${API_BASE}/payments/create-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ member_id: targetMember.id, member_name: targetMember.name, amount: numericAmount }),
@@ -323,7 +324,7 @@ export default function Billing() {
           transaction_id: response.razorpay_payment_id,
           paid_on: new Date().toISOString().split("T")[0],
         };
-        fetch("http://localhost:5000/payments", {
+        fetch(`${API_BASE}/payments`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -357,11 +358,11 @@ export default function Billing() {
 
   function fetchMembers() {
     setLoading(true);
-    fetch("http://localhost:5000/members")
+    fetch(`${API_BASE}/members`)
       .then(res => { if (!res.ok) throw new Error("Server returned an error"); return res.json(); })
       .then(data => { setMembers(Array.isArray(data) ? data : []); setLoading(false); setError(""); })
       .catch(err => {
-        setError("⚠️ Cannot connect to server (localhost:5000). Please ensure the backend is running.");
+        setError("⚠️ Cannot connect to backend. Please ensure the server is running.");
         setLoading(false);
       });
   }
@@ -493,7 +494,7 @@ export default function Billing() {
         paid_on: payDate
       };
 
-      fetch("http://localhost:5000/payments", {
+      fetch(`${API_BASE}/payments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)

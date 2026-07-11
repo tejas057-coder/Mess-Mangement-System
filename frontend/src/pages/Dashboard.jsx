@@ -3,6 +3,7 @@ import { useTheme } from "../context/ThemeContext";
 import RecentMembers from "../components/ui/RecentMembers";
 import MemberGrowth from "../components/ui/MemberGrowth";
 import QuickSummary from "../components/ui/QuickSummary";
+import API_BASE from "../api";
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -100,7 +101,7 @@ export default function Dashboard() {
   const [statsVisible, setStatsVisible] = useState(false);
 
   useEffect(() => {
-    fetch("http://localhost:5000/members")
+    fetch(`${API_BASE}/members`)
       .then(r => r.json())
       .then(d => setMembers(Array.isArray(d) ? d : []))
       .catch(() => {});

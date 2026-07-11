@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { FaSearch, FaBell, FaTimes, FaCalendarAlt, FaCheckDouble, FaTrashAlt } from "react-icons/fa";
 import { useTheme } from "../context/ThemeContext";
 import { toast } from "react-toastify";
+import API_BASE from "../api";
 
 function Navbar() {
   const { isDark, accent } = useTheme();
@@ -53,7 +54,7 @@ function Navbar() {
   };
 
   const fetchNotifications = () => {
-    fetch("http://localhost:5000/notifications")
+    fetch(`${API_BASE}/notifications`)
       .then(res => res.json())
       .then(data => {
         const list = Array.isArray(data) ? data : [];
@@ -126,19 +127,19 @@ function Navbar() {
   };
 
   const markAsRead = (id) => {
-    fetch(`http://localhost:5000/notifications/${id}/read`, { method: "PUT" })
+    fetch(`${API_BASE}/notifications/${id}/read`, { method: "PUT" })
       .then(() => setNotifications(prev => prev.map(n => n.id === id ? { ...n, read_status: 1 } : n)))
       .catch(err => console.error(err));
   };
 
   const markAllRead = () => {
-    fetch("http://localhost:5000/notifications/read-all", { method: "PUT" })
+    fetch(`${API_BASE}/notifications/read-all`, { method: "PUT" })
       .then(() => setNotifications(prev => prev.map(n => ({ ...n, read_status: 1 }))))
       .catch(err => console.error(err));
   };
 
   const clearAll = () => {
-    fetch("http://localhost:5000/notifications", { method: "DELETE" })
+    fetch(`${API_BASE}/notifications`, { method: "DELETE" })
       .then(() => setNotifications([]))
       .catch(err => console.error(err));
   };

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { useTheme } from "../context/ThemeContext";
+import API_BASE from "../api";
 
 const AVATAR_PALETTES = [
   "linear-gradient(135deg,#2563eb,#7c3aed)",
@@ -82,7 +83,7 @@ function Members() {
   const [visible,        setVisible]        = useState(false);
 
   useEffect(() => {
-    fetch("http://localhost:5000/members")
+    fetch(`${API_BASE}/members`)
       .then(res => res.json())
       .then(data => setMembers(data))
       .catch(err => console.log(err));
@@ -125,13 +126,13 @@ function Members() {
     try {
       let res;
       if (editingMember) {
-        res = await fetch(`http://localhost:5000/members/${editingMember.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(member) });
+        res = await fetch(`${API_BASE}/members/${editingMember.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(member) });
         const updData = await res.json();
         if (!res.ok) { toast.error(updData.message || "Failed to update member"); return; }
         setMembers(prev => prev.map(m => m.id === editingMember.id ? updData : m));
         toast.success("Member updated successfully!");
       } else {
-        res = await fetch("http://localhost:5000/members", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(member) });
+        res = await fetch(`${API_BASE}/members`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(member) });
         const newData = await res.json();
         if (!res.ok) { toast.error(newData.message || "Failed to add member"); return; }
         setMembers(prev => [...prev, newData]);
@@ -147,7 +148,7 @@ function Members() {
   const cancelDelete  = () => setDeleteMember(null);
   const confirmDelete = async () => {
     try {
-      const res = await fetch(`http://localhost:5000/members/${deleteMember.id}`, { method: "DELETE" });
+      const res = await fetch(`${API_BASE}/members/${deleteMember.id}`, { method: "DELETE" });
       const delData = await res.json();
       if (!res.ok) { toast.error(delData.message || "Failed to delete member"); return; }
       setMembers(prev => prev.filter(m => m.id !== deleteMember.id));
