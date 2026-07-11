@@ -8,6 +8,9 @@ import { useTheme } from "../context/ThemeContext";
 
 function Sidebar() {
   const { isDark, accent } = useTheme();
+  const ownerName = localStorage.getItem("owner_full_name") || "Mess Owner";
+  const ownerRole = localStorage.getItem("owner_role") || "Admin";
+  const messName = localStorage.getItem("messmate_name") || "MessMate Pro";
   const [isOpen, setIsOpen] = useState(false);
   const [screenSize, setScreenSize] = useState(getScreenSize());
 
@@ -150,7 +153,7 @@ function Sidebar() {
             {!isTablet && (
               <div>
                 <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "var(--text)", letterSpacing: "-0.02em" }}>
-                  MessMate
+                  {messName}
                 </h2>
                 <p style={{ margin: "3px 0 0", fontSize: 11, color: "var(--text-4)", fontWeight: 500 }}>
                   Mess Management
@@ -216,13 +219,13 @@ function Sidebar() {
             }}>
               <div style={{
                 width: 40, height: 40, borderRadius: 12,
-                background: "linear-gradient(135deg,#0f172a,#334155)",
+                background: `linear-gradient(135deg, ${accent.hex}, ${accent.dark})`,
                 color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
                 fontWeight: 800, fontSize: 15, flexShrink: 0,
-              }}>M</div>
+              }}>{ownerName.charAt(0).toUpperCase()}</div>
               <div style={{ minWidth: 0 }}>
-                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "var(--text)" }}>Mess Admin</p>
-                <span style={{ fontSize: 11, color: "var(--text-4)" }}>Administrator</span>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{ownerName}</p>
+                <span style={{ fontSize: 11, color: "var(--text-4)" }}>{ownerRole}</span>
               </div>
             </div>
           )}

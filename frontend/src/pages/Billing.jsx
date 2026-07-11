@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from "react"
 import BillingTable from "../components/ui/BillingTable.jsx";
 import { useTheme } from "../context/ThemeContext";
 import { toast } from "react-toastify";
+import ImageWithFallback from "../components/ImageWithFallback.jsx";
 
 // Load Razorpay checkout.js script dynamically
 function loadRazorpayScript() {
@@ -608,7 +609,7 @@ export default function Billing() {
       {/* ── Record Payment Modal ── */}
       {showPaymentModal && (
         <div className="members-modal">
-          <div className="members-modal-inner" style={{ backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", maxWidth: selectedMember ? 680 : 500, width: "100%" }}>
+          <div className="members-modal-inner" style={{ backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", maxWidth: selectedMember ? Math.min(680, window.innerWidth - 16) : Math.min(500, window.innerWidth - 16), width: "100%" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 22 }}>
               <div>
                 <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: "var(--text)", letterSpacing: "-0.02em" }}>
@@ -682,9 +683,8 @@ export default function Billing() {
                         </div>
                       ) : (
                         <>
-                        {/* User's Real QR Code Image */}
-                        <img 
-                          src="/payment_qr.jpg" 
+                        <ImageWithFallback 
+                          src={process.env.PUBLIC_URL + "/payment_qr.jpg"} 
                           alt="Real Payment QR" 
                           style={{ 
                             width: 140,
@@ -694,6 +694,7 @@ export default function Billing() {
                             boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
                             objectFit: "contain"
                           }} 
+                          fallback={<div style={{ width: 140, height: 140, background: "var(--bg-card)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-3)" }}>Image unavailable</div>}
                         />
                           <div style={{ textAlign: "center" }}>
                             <p style={{ margin: 0, fontSize: 10, color: "var(--text-4)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>

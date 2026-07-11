@@ -43,6 +43,21 @@ const PrimaryBtn = ({ children, style, ...props }) => {
 /* ── Profile tab ── */
 function ProfileTab() {
   const { accent } = useTheme();
+  const [fullName, setFullName] = useState(localStorage.getItem("owner_full_name") || "Mess Owner");
+  const [role, setRole] = useState(localStorage.getItem("owner_role") || "Admin");
+  const [email, setEmail] = useState(localStorage.getItem("owner_email") || "owner@messmate.com");
+  const [phone, setPhone] = useState(localStorage.getItem("owner_phone") || "+91 98765 43210");
+  const [address, setAddress] = useState(localStorage.getItem("owner_address") || "Pune, Maharashtra");
+
+  const handleSave = () => {
+    localStorage.setItem("owner_full_name", fullName);
+    localStorage.setItem("owner_role", role);
+    localStorage.setItem("owner_email", email);
+    localStorage.setItem("owner_phone", phone);
+    localStorage.setItem("owner_address", address);
+    toast.success("Owner profile saved successfully!");
+  };
+
   return (
     <Card>
       <h2 style={{ margin: "0 0 4px", fontSize: 20, fontWeight: 800, color: "var(--text)" }}>Profile Information</h2>
@@ -51,11 +66,11 @@ function ProfileTab() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 14, paddingBottom: 20, borderBottom: "1px solid var(--border-2)", marginBottom: 22 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div style={{ width: 62, height: 62, borderRadius: "50%", background: `linear-gradient(135deg,${accent.hex},${accent.dark})`, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 800, boxShadow: `0 12px 24px ${accent.shadow}`, flexShrink: 0, transition: "all 0.3s ease" }}>
-            MO
+            {fullName.charAt(0).toUpperCase()}
           </div>
           <div>
-            <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: "var(--text)" }}>Mess Owner</p>
-            <p style={{ margin: "3px 0 0", fontSize: 12, color: "var(--text-4)" }}>Admin · MessMate Pro</p>
+            <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: "var(--text)" }}>{fullName}</p>
+            <p style={{ margin: "3px 0 0", fontSize: 12, color: "var(--text-4)" }}>{role} · MessMate Pro</p>
           </div>
         </div>
         <button style={{ border: "1px solid var(--border)", background: "var(--bg-hover)", borderRadius: 10, padding: "9px 14px", fontSize: 13, fontWeight: 600, color: "var(--text-2)", cursor: "pointer" }}>
@@ -64,20 +79,27 @@ function ProfileTab() {
       </div>
 
       <div className="form-grid-2" style={{ gap: 16 }}>
-        {[["Full Name","Mess Owner"],["Email","owner@messmate.com"],["Phone","+91 98765 43210"],["Address","Pune, Maharashtra"]].map(([l, v]) => (
-          <div key={l} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <Label>{l}</Label>
-            <Input defaultValue={v} />
+        {[
+          ["Full Name", fullName, setFullName],
+          ["Role", role, setRole],
+          ["Email", email, setEmail],
+          ["Phone", phone, setPhone],
+          ["Address", address, setAddress]
+        ].map(([label, value, setter]) => (
+          <div key={label} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <Label>{label}</Label>
+            <Input value={value} onChange={e => setter(e.target.value)} />
           </div>
         ))}
       </div>
 
       <div style={{ marginTop: 22 }}>
-        <PrimaryBtn>Save Changes</PrimaryBtn>
+        <PrimaryBtn onClick={handleSave}>Save Changes</PrimaryBtn>
       </div>
     </Card>
   );
 }
+
 
 function MessDetailsTab() {
   const [messName, setMessName] = useState(localStorage.getItem("messmate_name") || "MessMate Pro");
@@ -169,12 +191,12 @@ function NotificationsTab() {
 
       <div style={{ borderRadius: 16, border: "1px solid var(--border)", overflow: "hidden" }}>
         {items.map(([key, title, sub], i) => (
-          <div key={key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 18px", borderTop: i === 0 ? "none" : "1px solid var(--border-2)", gap: 12 }}>
+          <div key={key} className="notification-item" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 18px", borderTop: i === 0 ? "none" : "1px solid var(--border-2)", gap: 12 }}>
             <div>
               <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{title}</p>
               <p style={{ margin: "3px 0 0", fontSize: 12, color: "var(--text-4)" }}>{sub}</p>
             </div>
-            <div
+            <div className="notification-toggle"
               onClick={() => setStates(s => ({ ...s, [key]: !s[key] }))}
               style={{
                 width: 46, height: 26, borderRadius: 999, padding: 3, cursor: "pointer", flexShrink: 0,
