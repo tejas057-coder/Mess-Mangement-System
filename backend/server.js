@@ -190,16 +190,26 @@ app.post("/members", (req, res) => {
     const remain = Math.max(0, total - paid);
     const computedStatus = remain <= 0 ? "paid" : (status || "pending");
 
+    // Clean up date inputs: if empty, set to null instead of "" to prevent SQL strict date error
+    const cleanDate = (d) => {
+        if (!d || String(d).trim() === "" || String(d).toLowerCase() === "dd-mm-yyyy") return null;
+        return d;
+    };
+
+    const finalStartingDate = cleanDate(starting_date);
+    const finalDueDate = cleanDate(due_date);
+    const finalPaidOn = cleanDate(paid_on);
+
     db.query(
         sql,
         [
             name,
             phone,
-            starting_date,
+            finalStartingDate,
             paid,
             remain,
-            due_date,
-            paid_on,
+            finalDueDate,
+            finalPaidOn,
             computedStatus,
             total,
         ],
@@ -282,15 +292,24 @@ app.put("/members/:id", (req, res) => {
             WHERE id = ?
         `;
 
+        // Clean up date inputs: if empty, set to null instead of "" to prevent SQL strict date error
+        const cleanDate = (d) => {
+            if (!d || String(d).trim() === "" || String(d).toLowerCase() === "dd-mm-yyyy") return null;
+            return d;
+        };
+
+        const finalStartingDate = cleanDate(starting_date);
+        const finalDueDate = cleanDate(due_date);
+
         db.query(
             sql,
             [
                 name,
                 phone,
-                starting_date,
+                finalStartingDate,
                 amount_paid,
                 amount_remain,
-                due_date,
+                finalDueDate,
                 computedStatus,
                 total,
                 id,
