@@ -19,4 +19,27 @@ db.connect((err) => {
     console.log("✅ MySQL Connected");
 });
 
+
+
+
+
+// railways testing bd code 
+
+// db.connect((err) => {
+//     if (err) {
+//         console.error("❌ MySQL connection failed:", err.message);
+//         return;
+//     }
+
+//     console.log("✅ Connected to Railway MySQL");
+
+//     db.query("SELECT DATABASE() AS db", (err, result) => {
+//         if (err) {
+//             console.log(err);
+//         } else {
+//             console.log(result);
+//         }
+//     });
+// });
+
 module.exports = db;
