@@ -537,10 +537,8 @@ export default function Billing() {
       padding: "24px",
       fontFamily: "Inter, sans-serif",
       color: "var(--text)",
-      transition: "background 0.3s ease",
       opacity: visible ? 1 : 0,
-      transform: visible ? "translateY(0)" : "translateY(10px)",
-      transition: "opacity 0.4s ease, transform 0.4s ease, background 0.3s ease",
+      transition: "opacity 0.4s ease, background 0.3s ease",
     }}>
 
       {/* ── Header ── */}
