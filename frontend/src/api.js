@@ -1,11 +1,18 @@
 // ─────────────────────────────────────────────────────────────
 //  API Base URL — works for both local dev and deployed Vercel
 //
-//  Priority (||  chain):
-//  1. VITE_API_URL  — set in .env (local) or Vercel env vars (production)
-//  2. Auto-detect   — if running on localhost, use localhost:5000
-//  3. Hard fallback — localhost:5000
+//  HOW IT WORKS:
+//  • Local dev:  reads VITE_API_URL from frontend/.env
+//               (set to http://localhost:5000)
+//  • Production: reads VITE_API_URL from Vercel dashboard
+//               Settings → Environment Variables → VITE_API_URL
+//               (set to your Render/Railway backend URL)
+//
+//  ⚠️  Vercel does NOT read your local .env file.
+//      You MUST set VITE_API_URL in the Vercel dashboard!
 // ─────────────────────────────────────────────────────────────
+
+const envURL = import.meta.env.VITE_API_URL;
 
 const isLocalhost =
   typeof window !== "undefined" &&
@@ -13,11 +20,19 @@ const isLocalhost =
     window.location.hostname === "127.0.0.1");
 
 const API_BASE =
-  // 1. Explicit env variable (highest priority — set in Vercel dashboard for prod)
-  import.meta.env.VITE_API_URL ||
-  // 2. Auto-detect: if we're on localhost, use local backend
-  (isLocalhost ? "http://localhost:5000" : "") ||
-  // 3. Hard fallback
+  // 1. Explicit env variable — MUST be set in Vercel dashboard for prod
+  (envURL && envURL.trim() !== "" ? envURL.trim() : null) ||
+  // 2. Auto-detect localhost
+  (isLocalhost ? "http://localhost:5000" : null) ||
+  // 3. Hard fallback (should never reach this in production)
   "http://localhost:5000";
+
+if (!isLocalhost && !envURL) {
+  console.warn(
+    "[MessMate] ⚠️ VITE_API_URL is not set!\n" +
+    "Go to Vercel → Settings → Environment Variables\n" +
+    "and add: VITE_API_URL = https://your-backend.onrender.com"
+  );
+}
 
 export default API_BASE;

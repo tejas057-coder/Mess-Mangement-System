@@ -28,34 +28,28 @@ const razorpay = new Razorpay({
 app.use("/webhook/razorpay", express.raw({ type: "application/json" }));
 
 // ─────────────────────────────────────────────────────────────
-//  CORS — || chain: works on localhost AND deployed Vercel
-//  Priority:
-//  1. FRONTEND_URL env var (set this in Railway/Render dashboard)
-//  2. Known localhost ports for local dev
-//  3. Any *.vercel.app origin (covers all your Vercel previews)
+//  CORS — allows localhost dev + all deployed Vercel frontends
 // ─────────────────────────────────────────────────────────────
 const allowedOrigins = [
-    // Local dev ports
+    // Local dev
     "http://localhost:5173",
     "http://localhost:5174",
     "http://localhost:5175",
     "http://localhost:3000",
-    // Your specific Vercel frontend URL
+    // Deployed Vercel frontend (all known URLs)
     "https://mess-mangement-system-bg44.vercel.app",
     "https://mess-mangement-system.vercel.app",
-    // Env-var override (set FRONTEND_URL in your cloud dashboard)
+    // Env-var override: set FRONTEND_URL in Render/Railway dashboard
     process.env.FRONTEND_URL || "",
 ].filter(Boolean);
 
 app.use(cors({
     origin: function (origin, callback) {
-        // Allow requests with no origin (Postman, mobile apps, server-to-server)
-        if (!origin) return callback(null, true);
-        // Allow exact matches
+        if (!origin) return callback(null, true); // Postman, server-to-server
         if (allowedOrigins.includes(origin)) return callback(null, true);
-        // Allow any Vercel preview/production URL dynamically
-        if (origin.endsWith(".vercel.app")) return callback(null, true);
-        // Block everything else
+        if (origin.endsWith(".vercel.app")) return callback(null, true); // any Vercel preview
+        if (origin.endsWith(".onrender.com")) return callback(null, true); // Render previews
+        console.warn("CORS blocked:", origin);
         callback(new Error("CORS: origin not allowed — " + origin));
     },
     credentials: true,

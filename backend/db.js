@@ -1,45 +1,66 @@
 const mysql = require("mysql2");
 require("dotenv").config();
 
-const useRailway = process.env.USE_RAILWAY_DB === "true";
+// ─────────────────────────────────────────────────────────────────
+//  DB Connection — supports all environments:
+//  1. MYSQL_PUBLIC_URL (Railway public URL string)  ← cloud prod
+//  2. DATABASE_URL (generic connection string)      ← other clouds
+//  3. Individual RAILWAY_DB_* vars                  ← Railway manual
+//  4. Individual LOCAL_DB_* vars                    ← local dev
+//  5. Hard-coded localhost fallback                 ← last resort
+// ─────────────────────────────────────────────────────────────────
 
-const db = mysql.createConnection({
-    host: useRailway ? process.env.RAILWAY_DB_HOST : process.env.LOCAL_DB_HOST,
-    port: useRailway ? process.env.RAILWAY_DB_PORT : process.env.LOCAL_DB_PORT,
-    user: useRailway ? process.env.RAILWAY_DB_USER : process.env.LOCAL_DB_USER,
-    password: useRailway ? process.env.RAILWAY_DB_PASSWORD : process.env.LOCAL_DB_PASSWORD,
-    database: useRailway ? process.env.RAILWAY_DB_NAME : process.env.LOCAL_DB_NAME,
-});
+let db;
+
+const connectionString = process.env.MYSQL_PUBLIC_URL || process.env.DATABASE_URL || null;
+
+if (connectionString) {
+    // Parse the MySQL connection URL: mysql://user:pass@host:port/dbname
+    try {
+        const url = new URL(connectionString);
+        db = mysql.createConnection({
+            host:     url.hostname,
+            port:     Number(url.port) || 3306,
+            user:     url.username,
+            password: url.password,
+            database: url.pathname.replace(/^\//, ""),
+            ssl:      { rejectUnauthorized: false },  // required for Railway public URLs
+        });
+        console.log(`🔗 Connecting via URL to ${url.hostname}:${url.port}`);
+    } catch (e) {
+        console.error("❌ Failed to parse DB connection URL:", e.message);
+        process.exit(1);
+    }
+} else if (process.env.USE_RAILWAY_DB === "true" && process.env.RAILWAY_DB_HOST) {
+    // Railway individual vars
+    db = mysql.createConnection({
+        host:     process.env.RAILWAY_DB_HOST,
+        port:     Number(process.env.RAILWAY_DB_PORT) || 3306,
+        user:     process.env.RAILWAY_DB_USER,
+        password: process.env.RAILWAY_DB_PASSWORD,
+        database: process.env.RAILWAY_DB_NAME,
+        ssl:      { rejectUnauthorized: false },
+    });
+    console.log(`🔗 Connecting to Railway DB at ${process.env.RAILWAY_DB_HOST}`);
+} else {
+    // Local development fallback
+    db = mysql.createConnection({
+        host:     process.env.LOCAL_DB_HOST     || process.env.DB_HOST     || "localhost",
+        port:     Number(process.env.LOCAL_DB_PORT || process.env.DB_PORT || 3306),
+        user:     process.env.LOCAL_DB_USER     || process.env.DB_USER     || "root",
+        password: process.env.LOCAL_DB_PASSWORD || process.env.DB_PASSWORD || "",
+        database: process.env.LOCAL_DB_NAME     || process.env.DB_NAME     || "college",
+    });
+    console.log("🔗 Connecting to local MySQL...");
+}
 
 db.connect((err) => {
     if (err) {
         console.error("❌ MySQL connection failed:", err.message);
+        // Don't crash the server — endpoints will return 500 if DB is down
         return;
     }
-    console.log("✅ MySQL Connected");
+    console.log("✅ MySQL Connected successfully");
 });
-
-
-
-
-
-// railways testing bd code 
-
-// db.connect((err) => {
-//     if (err) {
-//         console.error("❌ MySQL connection failed:", err.message);
-//         return;
-//     }
-
-//     console.log("✅ Connected to Railway MySQL");
-
-//     db.query("SELECT DATABASE() AS db", (err, result) => {
-//         if (err) {
-//             console.log(err);
-//         } else {
-//             console.log(result);
-//         }
-//     });
-// });
 
 module.exports = db;
