@@ -1,31 +1,15 @@
 const mysql = require("mysql2");
 require("dotenv").config();
 
-// ─────────────────────────────────────────────────────────────
-//  DB Connection — works for both local dev and deployed cloud
-//
-//  Priority (|| chain):
-//  1. DATABASE_URL  — single connection string from Railway / PlanetScale / Render
-//  2. Individual env vars (DB_HOST, DB_USER, etc.) — set in .env for local dev
-//  3. Hard-coded localhost fallbacks — if nothing is set at all
-// ─────────────────────────────────────────────────────────────
+const useRailway = process.env.USE_RAILWAY_DB === "true";
 
-let db;
-
-if (process.env.DATABASE_URL) {
-    // Cloud / Railway: single connection string
-    db = mysql.createConnection(process.env.DATABASE_URL);
-} else {
-    // Local dev: individual env vars with || fallbacks
-    db = mysql.createConnection({
-        host:     process.env.DB_HOST     || "localhost",
-        user:     process.env.DB_USER     || "root",
-        password: process.env.DB_PASSWORD || "",
-        database: process.env.DB_NAME     || "college",
-        port:     Number(process.env.DB_PORT || process.env.MYSQLPORT || 3306),
-        ssl:      process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : undefined,
-    });
-}
+const db = mysql.createConnection({
+    host: useRailway ? process.env.RAILWAY_DB_HOST : process.env.LOCAL_DB_HOST,
+    port: useRailway ? process.env.RAILWAY_DB_PORT : process.env.LOCAL_DB_PORT,
+    user: useRailway ? process.env.RAILWAY_DB_USER : process.env.LOCAL_DB_USER,
+    password: useRailway ? process.env.RAILWAY_DB_PASSWORD : process.env.LOCAL_DB_PASSWORD,
+    database: useRailway ? process.env.RAILWAY_DB_NAME : process.env.LOCAL_DB_NAME,
+});
 
 db.connect((err) => {
     if (err) {

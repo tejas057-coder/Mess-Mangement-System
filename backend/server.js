@@ -4,6 +4,17 @@ const cors = require("cors");
 const crypto = require("crypto");
 const Razorpay = require("razorpay");
 const db = require("./db");
+const { sendSMS } = require("./smsService");
+
+// ── SMS helper: reads phone + feature flags from env ──────────
+function smsEnabled(flag) {
+    return process.env.SMS_API_KEY &&
+           process.env.SMS_API_KEY !== "YOUR_FAST2SMS_API_KEY" &&
+           process.env[flag] !== "false";
+}
+function ownerPhone() {
+    return process.env.SMS_OWNER_PHONE || "";
+}
 
 const app = express();
 
@@ -204,13 +215,24 @@ app.post("/members", (req, res) => {
                 return res.status(500).json(err);
             }
 
-            // Create notification automatically
+            // Create in-app notification
             const notifTitle = "New Member Joined";
             const notifMsg = `${name} has been registered as a new member with total amount ₹${total}.`;
             const sqlNotif = "INSERT INTO notifications (title, message, type) VALUES (?, ?, 'member')";
             db.query(sqlNotif, [notifTitle, notifMsg], (notifErr) => {
                 if (notifErr) console.error("Error creating member notification:", notifErr);
             });
+
+            // Send SMS alert to owner
+            if (smsEnabled("SMS_ON_MEMBER_ADD") && ownerPhone()) {
+                const smsText = `MessMate: New member added! Name: ${name}, Phone: ${phone || "N/A"}, Monthly: Rs.${total}. Check your dashboard for details.`;
+                sendSMS(ownerPhone(), smsText);
+                // Also SMS the member if they have a phone number
+                if (phone) {
+                    const memberSms = `Welcome to the mess, ${name}! Your monthly fee is Rs.${total}. Joining date: ${starting_date || "today"}. - MessMate`;
+                    sendSMS(phone, memberSms);
+                }
+            }
 
             res.json({
                 id: result.insertId,
@@ -289,11 +311,17 @@ app.put("/members/:id", (req, res) => {
                     return res.status(404).json({ message: "Member not found" });
                 }
 
-                // Create update notification
+                // Create in-app notification
                 const notifTitle = "Member Profile Updated";
                 const notifMsg = `Profile details for ${name} have been updated. Dues calculated strictly based on transactions.`;
                 const sqlNotif = "INSERT INTO notifications (title, message, type) VALUES (?, ?, 'member')";
                 db.query(sqlNotif, [notifTitle, notifMsg]);
+
+                // Send SMS alert to owner
+                if (smsEnabled("SMS_ON_MEMBER_UPDATE") && ownerPhone()) {
+                    const smsText = `MessMate: Member updated - ${name} (Phone: ${phone || "N/A"}). Total: Rs.${total}, Paid: Rs.${amount_paid}, Due: Rs.${amount_remain}. Status: ${computedStatus}.`;
+                    sendSMS(ownerPhone(), smsText);
+                }
 
                 res.json({
                     id: Number(id),
@@ -500,14 +528,29 @@ app.post("/payments", (req, res) => {
                         return res.status(500).json(insertErr);
                     }
 
-                    // 4. Automatically trigger a notification
+                    // 4. Automatically trigger in-app notification
                     const notificationTitle = `Payment Received`;
                     const notificationMessage = `Successfully recorded ₹${amount_paid} from ${member_name} via ${payment_method}.`;
                     const insertNotificationSql = "INSERT INTO notifications (title, message, type) VALUES (?, ?, 'payment')";
-                    
                     db.query(insertNotificationSql, [notificationTitle, notificationMessage], (notifErr) => {
                         if (notifErr) console.error("Error creating payment notification:", notifErr);
                     });
+
+                    // 5. Send SMS alerts
+                    if (smsEnabled("SMS_ON_PAYMENT")) {
+                        // Alert owner
+                        if (ownerPhone()) {
+                            const ownerSms = `MessMate Payment: Rs.${amount_paid} received from ${member_name} via ${payment_method}. Ref: ${transaction_id || "Cash"}. Balance due: Rs.${newRemain}. Status: ${newStatus}.`;
+                            sendSMS(ownerPhone(), ownerSms);
+                        }
+                        // Alert member (if their phone is stored)
+                        if (member.phone) {
+                            const memberSms = newRemain <= 0
+                                ? `Dear ${member_name}, Rs.${amount_paid} payment received via ${payment_method}. Your mess dues are fully CLEARED! Thank you. - MessMate`
+                                : `Dear ${member_name}, Rs.${amount_paid} payment received via ${payment_method}. Remaining balance: Rs.${newRemain}. Thank you! - MessMate`;
+                            sendSMS(member.phone, memberSms);
+                        }
+                    }
 
                     res.json({
                         message: "Payment successfully recorded",
@@ -663,5 +706,35 @@ app.post("/webhook/razorpay", (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-    console.log("Server running on port 5000");
+    console.log(`Server running on port ${PORT}`);
+});
+
+// ─────────────────────────────────────────────
+// SMS SETTINGS ENDPOINTS
+// ─────────────────────────────────────────────
+
+// GET current SMS settings (masks API key for security)
+app.get("/sms-settings", (req, res) => {
+    const apiKey = process.env.SMS_API_KEY || "";
+    res.json({
+        configured:       apiKey && apiKey !== "YOUR_FAST2SMS_API_KEY",
+        apiKeyMasked:     apiKey ? apiKey.slice(0, 6) + "••••••••" + apiKey.slice(-4) : "",
+        ownerPhone:       process.env.SMS_OWNER_PHONE || "",
+        smsOnPayment:     process.env.SMS_ON_PAYMENT  !== "false",
+        smsOnMemberAdd:   process.env.SMS_ON_MEMBER_ADD !== "false",
+        smsOnMemberUpdate:process.env.SMS_ON_MEMBER_UPDATE !== "false",
+    });
+});
+
+// POST send a test SMS to verify the API key works
+app.post("/sms-settings/test", async (req, res) => {
+    const { phone } = req.body;
+    const testPhone = phone || process.env.SMS_OWNER_PHONE;
+    if (!testPhone) return res.status(400).json({ message: "No phone number provided" });
+    const result = await sendSMS(testPhone, "MessMate Test: SMS alerts are working correctly! Your mess management system is connected.");
+    if (result.success) {
+        res.json({ message: `✅ Test SMS sent to ${testPhone} successfully!` });
+    } else {
+        res.status(400).json({ message: `❌ Failed to send SMS: ${result.error}` });
+    }
 });

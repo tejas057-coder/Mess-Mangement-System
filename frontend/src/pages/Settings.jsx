@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useTheme, ACCENTS } from "../context/ThemeContext";
 import { toast } from "react-toastify";
+import API_BASE from "../api";
 
 const TABS = ["Profile", "Mess Details", "Notifications", "Security", "Appearance"];
 
@@ -176,43 +177,196 @@ function MessDetailsTab() {
 /* ── Notifications tab ── */
 function NotificationsTab() {
   const { accent } = useTheme();
-  const [states, setStates] = useState({ email: true, sms: false, push: true, billing: true, attendance: false });
-  const items = [
-    ["email",      "Email Notifications",  "Receive updates via email"],
-    ["sms",        "SMS Alerts",           "Get SMS for critical events"],
-    ["push",       "Push Notifications",   "Browser push alerts"],
-    ["billing",    "Billing Reminders",    "Payment due date alerts"],
-    ["attendance", "Attendance Reports",   "Daily attendance summary"],
-  ];
-  return (
-    <Card>
-      <h2 style={{ margin: "0 0 4px", fontSize: 20, fontWeight: 800, color: "var(--text)" }}>Notification Preferences</h2>
-      <p style={{ margin: "0 0 22px", fontSize: 13, color: "var(--text-3)" }}>Control how you receive alerts</p>
+  const [smsConfig, setSmsConfig] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [testPhone, setTestPhone] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [inAppStates, setInAppStates] = useState({
+    push: true, billing: true, attendance: false,
+  });
 
-      <div style={{ borderRadius: 16, border: "1px solid var(--border)", overflow: "hidden" }}>
-        {items.map(([key, title, sub], i) => (
-          <div key={key} className="notification-item" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 18px", borderTop: i === 0 ? "none" : "1px solid var(--border-2)", gap: 12 }}>
-            <div>
-              <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{title}</p>
-              <p style={{ margin: "3px 0 0", fontSize: 12, color: "var(--text-4)" }}>{sub}</p>
-            </div>
-            <div className="notification-toggle"
-              onClick={() => setStates(s => ({ ...s, [key]: !s[key] }))}
-              style={{
-                width: 46, height: 26, borderRadius: 999, padding: 3, cursor: "pointer", flexShrink: 0,
-                background: states[key] ? `linear-gradient(135deg,${accent.hex},${accent.dark})` : "var(--border)",
-                display: "flex", alignItems: "center",
-                justifyContent: states[key] ? "flex-end" : "flex-start",
-                transition: "all 0.25s ease",
-                boxShadow: states[key] ? `0 4px 12px ${accent.shadow}` : "none",
-              }}
-            >
-              <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#fff", boxShadow: "0 2px 4px rgba(0,0,0,0.2)" }} />
+  useEffect(() => {
+    fetch(`${API_BASE}/sms-settings`)
+      .then(r => r.json())
+      .then(d => { setSmsConfig(d); setLoading(false); })
+      .catch(() => { setSmsConfig(null); setLoading(false); });
+  }, []);
+
+  const handleTestSMS = () => {
+    setTesting(true);
+    fetch(`${API_BASE}/sms-settings/test`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: testPhone }),
+    })
+      .then(r => r.json())
+      .then(d => { toast.success(d.message); setTesting(false); })
+      .catch(() => { toast.error("Failed to reach backend"); setTesting(false); });
+  };
+
+  const Toggle = ({ on, onChange }) => (
+    <div
+      onClick={onChange}
+      style={{
+        width: 46, height: 26, borderRadius: 999, padding: 3, cursor: "pointer", flexShrink: 0,
+        background: on ? `linear-gradient(135deg,${accent.hex},${accent.dark})` : "var(--border)",
+        display: "flex", alignItems: "center",
+        justifyContent: on ? "flex-end" : "flex-start",
+        transition: "all 0.25s ease",
+        boxShadow: on ? `0 4px 12px ${accent.shadow}` : "none",
+      }}
+    >
+      <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#fff", boxShadow: "0 2px 4px rgba(0,0,0,0.2)" }} />
+    </div>
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+
+      {/* ── SMS Alerts Card ── */}
+      <Card>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+          <div>
+            <h2 style={{ margin: "0 0 4px", fontSize: 20, fontWeight: 800, color: "var(--text)" }}>📱 SMS Alerts</h2>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--text-3)" }}>Get real-time SMS for payments &amp; member updates</p>
+          </div>
+          {/* Status badge */}
+          {!loading && (
+            <span style={{
+              padding: "6px 14px", borderRadius: 999, fontSize: 12, fontWeight: 700,
+              background: smsConfig?.configured ? "#dcfce7" : "#fef3c7",
+              color: smsConfig?.configured ? "#16a34a" : "#92400e",
+              border: `1px solid ${smsConfig?.configured ? "#86efac" : "#fcd34d"}`,
+              flexShrink: 0,
+            }}>
+              {smsConfig?.configured ? "✅ Connected" : "⚠️ Not Configured"}
+            </span>
+          )}
+        </div>
+
+        {/* Info box */}
+        <div style={{ background: "var(--bg-hover)", borderRadius: 14, padding: "14px 16px", border: "1px solid var(--border-2)", marginBottom: 20 }}>
+          <p style={{ margin: "0 0 6px", fontSize: 13, fontWeight: 700, color: "var(--text)" }}>How to enable SMS alerts:</p>
+          <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "var(--text-3)", lineHeight: 2 }}>
+            <li>Sign up free at <strong style={{ color: "var(--accent)" }}>fast2sms.com</strong></li>
+            <li>Go to <strong>Dev API → Quick SMS</strong> and copy your API key</li>
+            <li>Open <code style={{ background: "var(--border)", padding: "1px 6px", borderRadius: 4, fontSize: 11 }}>backend/.env</code> and set:</li>
+          </ol>
+          <pre style={{ margin: "10px 0 0", background: "var(--bg-card)", borderRadius: 10, padding: "10px 14px", fontSize: 11, color: "var(--text-2)", border: "1px solid var(--border)", overflowX: "auto" }}>
+{`SMS_API_KEY=your_fast2sms_api_key_here
+SMS_OWNER_PHONE=your_10_digit_phone
+SMS_ON_PAYMENT=true
+SMS_ON_MEMBER_ADD=true
+SMS_ON_MEMBER_UPDATE=true`}
+          </pre>
+        </div>
+
+        {/* Current config status */}
+        {!loading && smsConfig && (
+          <div style={{ borderRadius: 14, border: "1px solid var(--border)", overflow: "hidden", marginBottom: 20 }}>
+            {[
+              ["API Key", smsConfig.configured ? smsConfig.apiKeyMasked : "Not set", smsConfig.configured ? "var(--accent)" : "var(--text-4)"],
+              ["Owner Phone", smsConfig.ownerPhone || "Not set", smsConfig.ownerPhone ? "var(--text)" : "var(--text-4)"],
+            ].map(([label, val, color], i) => (
+              <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderTop: i === 0 ? "none" : "1px solid var(--border-2)", flexWrap: "wrap", gap: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-3)" }}>{label}</span>
+                <code style={{ fontSize: 12, color, background: "var(--bg-hover)", padding: "3px 10px", borderRadius: 6 }}>{val}</code>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* SMS event toggles */}
+        {!loading && smsConfig && (
+          <div style={{ borderRadius: 14, border: "1px solid var(--border)", overflow: "hidden", marginBottom: 20 }}>
+            {[
+              ["smsOnPayment",      "💰 Payment Received",   "SMS when a member makes a payment"],
+              ["smsOnMemberAdd",    "👤 New Member Added",   "SMS when a new member is registered"],
+              ["smsOnMemberUpdate", "✏️ Member Updated",     "SMS when a member's profile is updated"],
+            ].map(([key, title, sub], i) => (
+              <div key={key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderTop: i === 0 ? "none" : "1px solid var(--border-2)", gap: 12 }}>
+                <div>
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{title}</p>
+                  <p style={{ margin: "3px 0 0", fontSize: 12, color: "var(--text-4)" }}>{sub}</p>
+                </div>
+                <div style={{
+                  padding: "4px 10px", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                  background: smsConfig[key] ? "#dcfce7" : "var(--bg-hover)",
+                  color: smsConfig[key] ? "#16a34a" : "var(--text-4)",
+                  border: `1px solid ${smsConfig[key] ? "#86efac" : "var(--border)"}`,
+                  flexShrink: 0,
+                }}>
+                  {smsConfig[key] ? "ON" : "OFF"}
+                </div>
+              </div>
+            ))}
+            <div style={{ padding: "10px 16px", background: "var(--bg-hover)", borderTop: "1px solid var(--border-2)" }}>
+              <p style={{ margin: 0, fontSize: 11, color: "var(--text-4)" }}>
+                💡 To change these, update <code style={{ background: "var(--border)", padding: "1px 5px", borderRadius: 4 }}>backend/.env</code> and restart the server.
+              </p>
             </div>
           </div>
-        ))}
-      </div>
-    </Card>
+        )}
+
+        {/* Test SMS */}
+        <div style={{ background: "var(--bg-hover)", borderRadius: 14, padding: "16px", border: "1px solid var(--border-2)" }}>
+          <p style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 700, color: "var(--text)" }}>🔔 Send Test SMS</p>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <input
+              type="tel"
+              placeholder="Enter 10-digit phone number"
+              value={testPhone}
+              onChange={e => setTestPhone(e.target.value)}
+              style={{
+                flex: 1, minWidth: 180, height: 44, borderRadius: 10, border: "1px solid var(--border)",
+                background: "var(--bg-input)", padding: "0 14px",
+                fontSize: 14, color: "var(--text)", outline: "none",
+              }}
+            />
+            <button
+              onClick={handleTestSMS}
+              disabled={testing || !testPhone}
+              style={{
+                height: 44, padding: "0 20px", borderRadius: 10, border: "none",
+                background: testing || !testPhone
+                  ? "var(--border)"
+                  : `linear-gradient(135deg,${accent.hex},${accent.dark})`,
+                color: testing || !testPhone ? "var(--text-4)" : "#fff",
+                fontSize: 13, fontWeight: 700, cursor: testing || !testPhone ? "not-allowed" : "pointer",
+                boxShadow: testing || !testPhone ? "none" : `0 6px 16px ${accent.shadow}`,
+                flexShrink: 0,
+              }}
+            >
+              {testing ? "Sending..." : "Send Test"}
+            </button>
+          </div>
+        </div>
+      </Card>
+
+      {/* ── In-App Notifications Card ── */}
+      <Card>
+        <h2 style={{ margin: "0 0 4px", fontSize: 20, fontWeight: 800, color: "var(--text)" }}>🔔 In-App Notifications</h2>
+        <p style={{ margin: "0 0 20px", fontSize: 13, color: "var(--text-3)" }}>Control dashboard &amp; browser notifications</p>
+        <div style={{ borderRadius: 16, border: "1px solid var(--border)", overflow: "hidden" }}>
+          {[
+            ["push",       "Push Notifications",   "Browser push alerts for new events"],
+            ["billing",    "Billing Reminders",    "Payment due date reminders"],
+            ["attendance", "Attendance Reports",   "Daily attendance summary"],
+          ].map(([key, title, sub], i) => (
+            <div key={key} className="notification-item" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 18px", borderTop: i === 0 ? "none" : "1px solid var(--border-2)", gap: 12 }}>
+              <div>
+                <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{title}</p>
+                <p style={{ margin: "3px 0 0", fontSize: 12, color: "var(--text-4)" }}>{sub}</p>
+              </div>
+              <Toggle
+                on={inAppStates[key]}
+                onChange={() => setInAppStates(s => ({ ...s, [key]: !s[key] }))}
+              />
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
   );
 }
 
