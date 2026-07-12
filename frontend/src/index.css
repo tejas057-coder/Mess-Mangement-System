@@ -174,20 +174,19 @@ input, select, textarea { font-family: inherit; }
 .members-modal {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.55);
+  background: rgba(15, 23, 42, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1500;
-  padding: 16px;
+  padding: 20px 16px;
   overflow-y: auto;
-  backdrop-filter: blur(4px);
-  /* ensure content is centred even when overflowing */
-  box-sizing: border-box;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 [data-theme="dark"] .members-modal {
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.75);
 }
 
 .members-modal-inner {
@@ -195,14 +194,37 @@ input, select, textarea { font-family: inherit; }
   border-radius: 24px;
   padding: 28px;
   width: 100%;
-  max-width: 700px;
-  max-height: 88vh;
+  max-height: 90vh;
   overflow-y: auto;
   box-shadow: var(--shadow-lg);
   border: 1px solid var(--border);
-  /* always centred horizontally */
-  margin: auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  animation: modalScaleIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
+
+@keyframes modalScaleIn {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* Responsive grid inside Billing modal */
+.billing-modal-grid {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 24px;
+  margin-bottom: 20px;
+  align-items: start;
+}
+
+@media (max-width: 640px) {
+  .billing-modal-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
 
 /* =============================================
    SETTINGS TABS (mobile)

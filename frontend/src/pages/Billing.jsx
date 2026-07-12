@@ -633,13 +633,10 @@ export default function Billing() {
 
             <form onSubmit={handleRecordPaymentSubmit}>
               <fieldset disabled={verifying} style={{ border: "none", padding: 0, margin: 0, display: "contents" }}>
-                <div style={{ 
-                  display: "grid", 
-                  gridTemplateColumns: selectedMember ? "220px 1fr" : "1fr", 
-                  gap: 24, 
-                  marginBottom: 20,
-                  alignItems: "start"
-                }}>
+                <div 
+                  className={selectedMember ? "billing-modal-grid" : ""} 
+                  style={!selectedMember ? { display: "grid", gridTemplateColumns: "1fr", gap: 16, marginBottom: 20 } : {}}
+                >
                   {/* Left Column: QR Code */}
                   {selectedMember && (
                     <div style={{
