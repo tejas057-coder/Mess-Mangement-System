@@ -16,26 +16,40 @@ const razorpay = new Razorpay({
 // Raw body parser needed ONLY for webhook signature verification
 app.use("/webhook/razorpay", express.raw({ type: "application/json" }));
 
+// ─────────────────────────────────────────────────────────────
+//  CORS — || chain: works on localhost AND deployed Vercel
+//  Priority:
+//  1. FRONTEND_URL env var (set this in Railway/Render dashboard)
+//  2. Known localhost ports for local dev
+//  3. Any *.vercel.app origin (covers all your Vercel previews)
+// ─────────────────────────────────────────────────────────────
 const allowedOrigins = [
+    // Local dev ports
     "http://localhost:5173",
     "http://localhost:5174",
     "http://localhost:5175",
     "http://localhost:3000",
+    // Your specific Vercel frontend URL
+    "https://mess-mangement-system-bg44.vercel.app",
     "https://mess-mangement-system.vercel.app",
-    process.env.FRONTEND_URL,  // extra override from env if needed
+    // Env-var override (set FRONTEND_URL in your cloud dashboard)
+    process.env.FRONTEND_URL || "",
 ].filter(Boolean);
 
 app.use(cors({
     origin: function (origin, callback) {
-        // Allow requests with no origin (mobile apps, curl, Postman)
+        // Allow requests with no origin (Postman, mobile apps, server-to-server)
         if (!origin) return callback(null, true);
+        // Allow exact matches
         if (allowedOrigins.includes(origin)) return callback(null, true);
+        // Allow any Vercel preview/production URL dynamically
+        if (origin.endsWith(".vercel.app")) return callback(null, true);
+        // Block everything else
         callback(new Error("CORS: origin not allowed — " + origin));
     },
     credentials: true,
 }));
 app.use(express.json());
-
 
 // Initialize database tables
 const initDB = () => {
