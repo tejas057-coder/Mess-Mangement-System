@@ -1,15 +1,6 @@
 const mysql = require("mysql2");
 require("dotenv").config();
 
-// ─────────────────────────────────────────────────────────────────
-//  DB Connection — supports all environments:
-//  1. MYSQL_PUBLIC_URL (Railway public URL string)  ← cloud prod
-//  2. DATABASE_URL (generic connection string)      ← other clouds
-//  3. Individual RAILWAY_DB_* vars                  ← Railway manual
-//  4. Individual LOCAL_DB_* vars                    ← local dev
-//  5. Hard-coded localhost fallback                 ← last resort
-// ─────────────────────────────────────────────────────────────────
-
 let db;
 
 const connectionString = process.env.MYSQL_PUBLIC_URL || process.env.DATABASE_URL || null;

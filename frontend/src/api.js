@@ -1,17 +1,3 @@
-// ─────────────────────────────────────────────────────────────
-//  API Base URL — works for both local dev and deployed Vercel
-//
-//  HOW IT WORKS:
-//  • Local dev:  reads VITE_API_URL from frontend/.env
-//               (set to http://localhost:5000)
-//  • Production: reads VITE_API_URL from Vercel dashboard
-//               Settings → Environment Variables → VITE_API_URL
-//               (set to your Render/Railway backend URL)
-//
-//  ⚠️  Vercel does NOT read your local .env file.
-//      You MUST set VITE_API_URL in the Vercel dashboard!
-// ─────────────────────────────────────────────────────────────
-
 const envURL = import.meta.env.VITE_API_URL;
 
 const isLocalhost =

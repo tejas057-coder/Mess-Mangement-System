@@ -42,7 +42,7 @@ function Sidebar() {
   const menuItems = [
     { name: "Dashboard", icon: <FaHome />, path: "/" },
     { name: "Members",   icon: <FaUsers />, path: "/members" },
-    { name: "Attendance",icon: <FaCalendarAlt />, path: "/attendance" },
+    { name: "Menu Management", icon: <span style={{ fontSize: 16 }}>🍽️</span>, path: "/menu" },
     { name: "Billing",   icon: <FaMoneyBill />, path: "/billing" },
     { name: "Settings",  icon: <FaCog />, path: "/settings" },
   ];

@@ -135,6 +135,60 @@ const initDB = () => {
             if (syncErr) console.error("Error syncing members financial integrity on startup:", syncErr);
             else console.log("Database financial consistency synced and verified successfully on startup");
         });
+
+        // 4. menus table (date, lunch JSON, dinner JSON, notes, announcement, status, image)
+        const createMenusTable = `
+            CREATE TABLE IF NOT EXISTS menus (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                menu_date DATE NOT NULL UNIQUE,
+                lunch JSON,
+                dinner JSON,
+                chef_note TEXT,
+                announcement TEXT,
+                special_dish VARCHAR(255),
+                menu_type VARCHAR(50) DEFAULT 'Regular',
+                image LONGTEXT,
+                status VARCHAR(50) DEFAULT 'Draft',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            )
+        `;
+        db.query(createMenusTable, (err) => {
+            if (err) console.error("Error creating menus table:", err);
+            else console.log("Menus table verified/created");
+        });
+
+        // 5. menu_feedback table (ratings and text comment)
+        const createMenuFeedbackTable = `
+            CREATE TABLE IF NOT EXISTS menu_feedback (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                menu_id INT NOT NULL,
+                student_id INT DEFAULT NULL,
+                rating INT NOT NULL,
+                feedback TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (menu_id) REFERENCES menus(id) ON DELETE CASCADE
+            )
+        `;
+        db.query(createMenuFeedbackTable, (err) => {
+            if (err) console.error("Error creating menu_feedback table:", err);
+            else console.log("Menu feedback table verified/created");
+        });
+
+        // 6. menu_templates table (predefined menu templates)
+        const createMenuTemplatesTable = `
+            CREATE TABLE IF NOT EXISTS menu_templates (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                template_name VARCHAR(255) NOT NULL UNIQUE,
+                lunch JSON,
+                dinner JSON,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `;
+        db.query(createMenuTemplatesTable, (err) => {
+            if (err) console.error("Error creating menu_templates table:", err);
+            else console.log("Menu templates table verified/created");
+        });
     });
 };
 
@@ -714,6 +768,222 @@ app.post("/webhook/razorpay", (req, res) => {
                 }
             );
         });
+    });
+});
+
+// ─────────────────────────────────────────────
+// MENU MANAGEMENT ENDPOINTS
+// ─────────────────────────────────────────────
+
+// GET today's published menu + ratings/feedback
+app.get("/api/menu/today", (req, res) => {
+    const targetDate = req.query.date || new Date().toISOString().split("T")[0];
+    db.query("SELECT * FROM menus WHERE menu_date = ?", [targetDate], (err, menus) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (menus.length === 0) {
+            return res.json({ menu: null });
+        }
+        const menu = menus[0];
+        
+        // Fetch feedback stats
+        db.query("SELECT AVG(rating) as avgRating, COUNT(id) as totalRatings FROM menu_feedback WHERE menu_id = ?", [menu.id], (err2, stats) => {
+            if (err2) return res.status(500).json({ error: err2.message });
+            
+            // Fetch recent feedback comments
+            db.query("SELECT * FROM menu_feedback WHERE menu_id = ? ORDER BY created_at DESC LIMIT 10", [menu.id], (err3, comments) => {
+                if (err3) return res.status(500).json({ error: err3.message });
+                
+                res.json({
+                    menu,
+                    avgRating: parseFloat(stats[0].avgRating) || 0,
+                    totalRatings: stats[0].totalRatings || 0,
+                    feedback: comments
+                });
+            });
+        });
+    });
+});
+
+// GET all menus
+app.get("/api/menu", (req, res) => {
+    db.query("SELECT * FROM menus ORDER BY menu_date DESC", (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results);
+    });
+});
+
+// GET menu history (with search/pagination)
+app.get("/api/menu/history", (req, res) => {
+    const searchDate = req.query.date || "";
+    const limit = parseInt(req.query.limit) || 5;
+    const offset = parseInt(req.query.offset) || 0;
+    
+    let sql = "SELECT * FROM menus";
+    let params = [];
+    if (searchDate) {
+        sql += " WHERE menu_date = ?";
+        params.push(searchDate);
+    }
+    sql += " ORDER BY menu_date DESC LIMIT ? OFFSET ?";
+    params.push(limit, offset);
+
+    db.query(sql, params, (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        
+        let countSql = "SELECT COUNT(*) as count FROM menus";
+        let countParams = [];
+        if (searchDate) {
+            countSql += " WHERE menu_date = ?";
+            countParams.push(searchDate);
+        }
+        
+        db.query(countSql, countParams, (err2, countRes) => {
+            if (err2) return res.status(500).json({ error: err2.message });
+            
+            res.json({
+                menus: results,
+                totalCount: countRes[0].count
+            });
+        });
+    });
+});
+
+// GET menu by ID
+app.get("/api/menu/:id", (req, res) => {
+    db.query("SELECT * FROM menus WHERE id = ?", [req.params.id], (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (results.length === 0) return res.status(404).json({ message: "Menu not found" });
+        res.json(results[0]);
+    });
+});
+
+// POST save / publish menu
+app.post("/api/menu", (req, res) => {
+    const { menu_date, lunch, dinner, chef_note, announcement, special_dish, menu_type, image, status } = req.body;
+    const sql = `
+        INSERT INTO menus (menu_date, lunch, dinner, chef_note, announcement, special_dish, menu_type, image, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE 
+            lunch = VALUES(lunch), 
+            dinner = VALUES(dinner),
+            chef_note = VALUES(chef_note),
+            announcement = VALUES(announcement),
+            special_dish = VALUES(special_dish),
+            menu_type = VALUES(menu_type),
+            image = VALUES(image),
+            status = VALUES(status)
+    `;
+    
+    db.query(sql, [
+        menu_date, 
+        JSON.stringify(lunch), 
+        JSON.stringify(dinner), 
+        chef_note || "", 
+        announcement || "", 
+        special_dish || "", 
+        menu_type || "Regular", 
+        image || null, 
+        status || "Draft"
+    ], (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        
+        if (status === "Published") {
+            const notifTitle = "🍽️ Today's Menu Updated";
+            const notifMsg = `Today's menu (${menu_date}) has been updated. Special dish: ${special_dish || "No Special Dish"}.`;
+            db.query("INSERT INTO notifications (title, message, type) VALUES (?, ?, 'menu')", [notifTitle, notifMsg]);
+        }
+
+        res.json({ message: "Menu saved successfully", id: result.insertId || null });
+    });
+});
+
+// PUT update menu
+app.put("/api/menu/:id", (req, res) => {
+    const { menu_date, lunch, dinner, chef_note, announcement, special_dish, menu_type, image, status } = req.body;
+    const sql = `
+        UPDATE menus 
+        SET menu_date = ?, lunch = ?, dinner = ?, chef_note = ?, announcement = ?, special_dish = ?, menu_type = ?, image = ?, status = ?
+        WHERE id = ?
+    `;
+    
+    db.query(sql, [
+        menu_date, 
+        JSON.stringify(lunch), 
+        JSON.stringify(dinner), 
+        chef_note || "", 
+        announcement || "", 
+        special_dish || "", 
+        menu_type || "Regular", 
+        image || null, 
+        status || "Draft",
+        req.params.id
+    ], (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+
+        if (status === "Published") {
+            const notifTitle = "🍽️ Today's Menu Updated";
+            const notifMsg = `Today's menu (${menu_date}) has been updated. Special dish: ${special_dish || "No Special Dish"}.`;
+            db.query("INSERT INTO notifications (title, message, type) VALUES (?, ?, 'menu')", [notifTitle, notifMsg]);
+        }
+
+        res.json({ message: "Menu updated successfully" });
+    });
+});
+
+// DELETE menu
+app.delete("/api/menu/:id", (req, res) => {
+    db.query("DELETE FROM menus WHERE id = ?", [req.params.id], (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: "Menu deleted successfully" });
+    });
+});
+
+// POST save menu template
+app.post("/api/menu/template", (req, res) => {
+    const { template_name, lunch, dinner } = req.body;
+    const sql = `
+        INSERT INTO menu_templates (template_name, lunch, dinner)
+        VALUES (?, ?, ?)
+        ON DUPLICATE KEY UPDATE 
+            lunch = VALUES(lunch),
+            dinner = VALUES(dinner)
+    `;
+    db.query(sql, [template_name, JSON.stringify(lunch), JSON.stringify(dinner)], (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: "Template saved successfully", id: result.insertId });
+    });
+});
+
+// GET all menu templates
+app.get("/api/menu/templates", (req, res) => {
+    db.query("SELECT * FROM menu_templates ORDER BY created_at DESC", (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results);
+    });
+});
+
+// POST duplicate yesterday's menu or copy target date
+app.post("/api/menu/duplicate", (req, res) => {
+    const { date } = req.body;
+    db.query("SELECT * FROM menus WHERE menu_date = ?", [date], (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (results.length === 0) return res.status(404).json({ message: "No menu found for this date" });
+        res.json(results[0]);
+    });
+});
+
+// POST submit menu rating & feedback
+app.post("/api/menu/rating", (req, res) => {
+    const { menu_id, student_id, rating, feedback } = req.body;
+    if (!menu_id || !rating) return res.status(400).json({ message: "Menu ID and rating are required" });
+    
+    const sql = `
+        INSERT INTO menu_feedback (menu_id, student_id, rating, feedback)
+        VALUES (?, ?, ?, ?)
+    `;
+    db.query(sql, [menu_id, student_id || null, rating, feedback || ""], (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: "Feedback submitted successfully!", id: result.insertId });
     });
 });
 

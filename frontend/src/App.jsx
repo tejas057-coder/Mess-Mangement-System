@@ -6,7 +6,7 @@ import Maincontenet from "./pages/Maincontenet";
 import Dashboard from "./pages/Dashboard";
 import Members from "./pages/Members";
 import Billing from "./pages/Billing";
-import Attendance from "./pages/Attendence";
+import Menu from "./pages/Menu";
 import Settings from "./pages/Settings";
 
 function App() {
@@ -19,7 +19,8 @@ function App() {
               <Route path="/"           element={<Dashboard />} />
               <Route path="/members"    element={<Members />} />
               <Route path="/billing"    element={<Billing />} />
-              <Route path="/attendance" element={<Attendance />} />
+              <Route path="/menu"       element={<Menu />} />
+              <Route path="/attendance" element={<Menu />} />
               <Route path="/settings"   element={<Settings />} />
             </Route>
           </Route>
